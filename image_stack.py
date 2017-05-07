@@ -62,6 +62,18 @@ class ImageStack(object):
         if steps is not None:
             self.steps = [steps[0], steps[1]]
 
+    def check_slice(self, x, y, margin=0):
+        """
+        check slice is valid (not off the edge of the image)
+        """
+        sqrt_beamsize = sqrt(self.get_pixel_beam())
+        x_slice, y_slice = pix2stamp(x, y, margin+int(round(10*max(1, sqrt_beamsize))))
+        if not all(0 < s < self.data.shape[2] for s in (x_slice.start, x_slice.stop)):
+            return 1
+        if not all(0 < s < self.data.shape[1] for s in (y_slice.start, y_slice.stop)):
+            return 1
+        return 0
+
     def get_interval(self):
         """
         Get interval between neighbouring images
@@ -81,7 +93,6 @@ class ImageStack(object):
         """
         pixcoord = self.wcs.celestial.wcs_world2pix(np.array([[ra, dec]]), 0)
         if floor:
-            #pixcoord = np.floor(pixcoord).astype(np.int)
             pixcoord = np.round(pixcoord).astype(np.int)
         return pixcoord[0, 0], pixcoord[0, 1]
 
@@ -192,80 +203,15 @@ class ImageStack(object):
         avg_pol=True, correct=False Average polarisations weighting for primary beam
         avg_pol=False, correct=True Return both polarisations corrected for primary beam
         avg_pol=False, correct=False Return both polarisations, no primary beam correction
-
-        NB uncoventionally this return the rms multiplied by the square root of
-        the number of pixels in the synthesised beam, to take account of
-        correlation between pixels.
         """
-        sqrt_beamsize = sqrt(self.get_pixel_beam())
         cube = self.pix2cube(x, y, int(round(10*max(1, sqrt_beamsize))), avg_pol=avg_pol, correct=correct)
         if avg_pol is True:
             #cube has axes x, y, time
-            return sqrt_beamsize*semihex(cube.reshape(cube.shape[0]*cube.shape[1], cube.shape[2]), axis=0)
+            return semihex(cube.reshape(cube.shape[0]*cube.shape[1], cube.shape[2]), axis=0)
         else:
             #cube has axes pol, x, y, time
-            return sqrt_beamsize*semihex(cube.reshape(cube.shape[0], cube.shape[1]*cube.shape[2], cube.shape[3]), axis=1)
+            return semihex(cube.reshape(cube.shape[0], cube.shape[1]*cube.shape[2], cube.shape[3]), axis=1)
 
-    def pix2moments(self, x, y, correct=True):
-        """
-        Moments are assumed to be polarisation-averaged already.
-
-        Correct will correct the first two moments *only* for the primary beam
-        """
-        #moments = self.group['moments'][0, 0, y, x, :]
-        moments = self.group['moments'][y, x, 0, :]
-        if correct is True:
-            moments[:2] /= self.pix2beam(x, y)
-        return moments
-
-    def check_slice(self, x, y, margin=0):
-        """
-        check slice is valid (not off the edge of the image)
-        """
-        sqrt_beamsize = sqrt(self.get_pixel_beam())
-        x_slice, y_slice = pix2stamp(x, y, margin+int(round(10*max(1, sqrt_beamsize))))
-        if not all(0 < s < self.data.shape[2] for s in (x_slice.start, x_slice.stop)):
-            return 1
-        if not all(0 < s < self.data.shape[1] for s in (y_slice.start, y_slice.stop)):
-            return 1
-        return 0
-
-    def pix2moment_bkg(self, x, y, correct=True, moment=1):
-        """
-        return median value of moment in local area
-
-        Moments are assumed to be polarisation-averaged already.
-
-        Correct will correct the first two moments *only* for the primary beam
-        """
-        sqrt_beamsize = sqrt(self.get_pixel_beam())
-        x_slice, y_slice = pix2stamp(x, y, int(round(10*max(1, sqrt_beamsize))))
-
-        #stamp = self.group['moments'][0, 0, y_slice, x_slice, moment]
-        #print x_slice, y_slice
-        stamp = self.group['moments'][y_slice, x_slice, 0, moment]
-        if correct is True:
-            stamp /= self.pix2beam(x, y)
-        return np.median(stamp)
-
-    def pix2moment_rms(self, x, y, correct=True, moment=1, correct_correlation=True):
-        """
-        return rms of moment in local area
-
-        Moments are assumed to be polarisation-averaged already.
-
-        Correct will correct the first two moments *only* for the primary beam
-        """
-        sqrt_beamsize = sqrt(self.get_pixel_beam())
-        x_slice, y_slice = pix2stamp(x, y, int(round(10*max(1, sqrt_beamsize))))
-        #stamp = self.group['moments'][0, 0, y_slice, x_slice, moment]
-        stamp = self.group['moments'][y_slice, x_slice, 0, moment]
-        if correct is True:
-            stamp /= self.pix2beam(x, y)
-        if correct_correlation:
-            return sqrt_beamsize*semihex(stamp)
-        else:
-            return semihex(stamp)
 
 if __name__ == "__main__":
     """
