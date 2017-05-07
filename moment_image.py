@@ -1,20 +1,17 @@
 from mpi4py import MPI
-import sys, os
+import os
 from optparse import OptionParser #NB zeus does not have argparse!
-from math import ceil
 import numpy as np
 from astropy.io import fits
-from scipy.signal import butter, filtfilt, hann, convolve, triang
+from scipy.signal import butter, filtfilt
 from scipy.stats import skew, kurtosis
 import h5py
 from image_stack import ImageStack
 
-HDF5_DIR = "hdf5"
-HDF5_IN = "%d.hdf5"
-HDF5_OUT = "%d%s_moments.hdf5"
+HDF5_OUT = "%s%s_moments.hdf5"
 IMAGE_TYPE='image'
 N_MOMENTS=4
-FITS_OUT="%d_%s%s_moment_%d.fits"
+FITS_OUT="%s_%s%s_moment%d.fits"
 VERSION='0.1'
 POLS=['XX', 'YY']
 
@@ -29,9 +26,11 @@ FILTER_HI = butter
 bb, ab = FILTER(FILTER_ORDER, FILTER_CUTOFF, btype='highpass')
 bb_hi, ab_hi = FILTER(FILTER_HI_ORDER, FILTER_HI_CUTOFF, btype='lowpass')
 
-parser = OptionParser(usage = "usage: %prog obsid freq" +
+parser = OptionParser(usage = "usage:" +
     """
-    calculate moments 
+    mpirun -np 8 --timestamp-output \
+        python moment_image.py \
+               my_hdf5_file --start=8 --stop=568 --filter_lo --filter_hi --suffix=_short
     """)
 parser.add_option("-f", "--freq", default=None, dest="freq", help="freq")
 parser.add_option("--filter_hi", action="store_true", dest="filter_hi", help="apply high-end (low-pass) filter")
@@ -42,7 +41,8 @@ parser.add_option("--start", default=8, dest="start", type="int", help="start ti
 parser.add_option("--stop", default=584, dest="stop", type="int", help="stop timestep")
 
 opts, args = parser.parse_args()
-obsid = int(args[0])
+hdf5_in= int(args[0])
+basename = os.path.splitext(hdf5_in)
 freq = args[1]
 timesteps = [opts.start, opts.stop]
 
@@ -65,24 +65,23 @@ def index_to_chunk(index, chunk_x, data_x, chunk_y, data_y):
     y_index = index//(data_x//chunk_x)
     return slice(x_index*chunk_x, (x_index+1)*chunk_x), slice(y_index*chunk_y, (y_index+1)*chunk_y)
 
-imstack = ImageStack(os.path.join(HDF5_DIR, HDF5_IN % obsid), freq=freq, steps=timesteps)
-if os.path.exists(os.path.join(HDF5_DIR, HDF5_OUT % (obsid, opts.suffix))):
-    with h5py.File(os.path.join(HDF5_DIR, HDF5_OUT % (obsid, opts.suffix))) as df:
+imstack = ImageStack(hdf5_in, freq=freq, steps=timesteps)
+if os.path.exists(HDF5_OUT % (basename, opts.suffix)):
+    with h5py.File(HDF5_OUT % (basename, opts.suffix)) as df:
         assert not freq in df.keys(), "output hdf5 file already contains this %s" % freq
     
 for i in range(N_MOMENTS):
-    out_fits = FITS_OUT % (obsid, freq, opts.suffix, i)
+    out_fits = FITS_OUT % (basename, freq, opts.suffix, i)
     assert os.path.exists(out_fits) is False, "output fits file %s exists" % out_fits
 
 chunk_x = imstack.data.chunks[2]
 chunk_y = imstack.data.chunks[1]
-#FIXME swap x and y throughout!!
 data_x = imstack.data.shape[2]
 data_y = imstack.data.shape[1]
 total_chunks = (data_x/chunk_x)*(data_x/chunk_x)
 
-tag_pad = len(str(total_chunks))
-rank_pad = len(str(size))
+tag_pad = len(str(total_chunks)) # for tidy printing
+rank_pad = len(str(size))        # 
 
 if rank == 0:
     print "Master started on {}. {} Workers to process {} chunks".format(name, size-1, total_chunks)
@@ -93,32 +92,32 @@ if rank == 0:
         source = status.Get_source()
         tag = status.Get_tag()
         slice_x, slice_y = index_to_chunk(tag, chunk_x, data_x, chunk_y, data_y)
-        #print "chunk {} received from {}, {}/{} completed".format(tag, source, sum(completed), total_chunks)
         out_data[slice_y, slice_x] = data
         completed[tag] = True
         print "chunk {} received from {}, {}/{} completed".format(str(tag).rjust(tag_pad),
                                                                   str(source).rjust(rank_pad),
                                                                   str(sum(completed)).rjust(tag_pad),
                                                                   total_chunks)
-    #np.save("moment_image.npy", out_data)
-    with h5py.File(os.path.join(HDF5_DIR, HDF5_OUT % (obsid, opts.suffix))) as df:
+    # write out moments in hdf5 file
+    with h5py.File(os.path.join(HDF5_DIR, HDF5_OUT % (basename, opts.suffix))) as df:
         df.attrs['VERSION'] = VERSION
         if not freq in df.keys():
             df.create_group(freq)
         moments = df[freq].create_dataset("moments", (data_y, data_x, 1, N_MOMENTS), dtype=np.float32, compression='gzip', shuffle=True)
         moments[:, :, 0, :] = out_data
         if opts.filter_lo:
-            moments.attrs['FILTER_LO_FILTER'] = 'butter'
+            moments.attrs['FILTER_LO_FILTER'] = FILTER.__name__
             moments.attrs['FILTER_LO_ORDER'] = FILTER_ORDER
             moments.attrs['FILTER_LO_CUTOFF'] = FILTER_CUTOFF
         if opts.filter_hi:
-            moments.attrs['FILTER_HI_FILTER'] = 'butter'
+            moments.attrs['FILTER_HI_FILTER'] = FILTER_HI.__name__
             moments.attrs['FILTER_HI_ORDER'] = FILTER_HI_ORDER
             moments.attrs['FILTER_HI_CUTOFF'] = FILTER_HI_CUTOFF
 
-        df[freq]['beam'] = h5py.ExternalLink(HDF5_IN % obsid, imstack.group['beam'].name)
-        df[freq][imstack.image_type] = h5py.ExternalLink(HDF5_IN % obsid, imstack.data.name)
-        df[freq]['header'] = h5py.ExternalLink(HDF5_IN % obsid, imstack.group['header'].name)
+        # provide links to time-series file
+        df[freq]['beam'] = h5py.ExternalLink(hdf5_in, imstack.group['beam'].name)
+        df[freq][imstack.image_type] = h5py.ExternalLink(hdf5_in, imstack.data.name)
+        df[freq]['header'] = h5py.ExternalLink(hdf5_in, imstack.group['header'].name)
 
     # write out fits files
     for i in range(N_MOMENTS):
@@ -127,11 +126,11 @@ if rank == 0:
             hdu.header[k] = v
         hdu.header["MOMENT"] = i
         if opts.filter_lo:
-            hdu.header['LOFILT'] = 'butter'
+            hdu.header['LOFILT'] = FILTER.__name__
             hdu.header['LOORDER'] = FILTER_ORDER
             hdu.header['LOCUTOF'] = FILTER_CUTOFF
         if opts.filter_hi:
-            hdu.header['HIFILT'] = 'butter'
+            hdu.header['HIFILT'] = FILTER_HI.__name__
             hdu.header['HIORDER'] = FILTER_HI_ORDER
             hdu.header['HICUTOFF'] = FILTER_HI_CUTOFF
         hdu.writeto(FITS_OUT % (obsid, freq, opts.suffix, i+1))
@@ -140,7 +139,7 @@ else:
     indexes = range(rank-1, total_chunks, size-1)
     print "Worker rank {} processing {} chunks".format(rank, len(indexes))
     data = np.zeros((chunk_y, chunk_x, N_MOMENTS))
-    # this should minimise disk reads by reading similar disks at approximately the same time
+    # this should minimise disk reads by reading adjacent parts of the file at approximately the same time
     # i.e. processes 1-N will read chunks 1-N at about the same time
     for index in indexes:
         slice_x, slice_y = index_to_chunk(index, chunk_x, data_x, chunk_y, data_y)
