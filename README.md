@@ -3,11 +3,11 @@ Take a set of fits images (which share a World Coordinate system, but span diffe
 
 ## Known issues
 
-This software has been written for IPS studies with the MWA, with imaging done using WSClean. Contact me if you wish to use this software for other purposes
+This software has been written for IPS studies with the MWA. It is currently limited in its ability to handle multiple spectral channels and expects the filenames to be in the format produced by WSClean. Contact me if you wish to use this software for other purposes.
 
 ## Usage
 ### Make Image Stack
-The script `make_imstack.py` can be used to read the fits files into the hdf5 file. Run the script with the `-h' flag for instructions. This is by far the least efficient part of the process. Note that this script relies on the `h5py_cache` which is available via pip.
+The script `make_imstack.py` can be used to read the fits files into the hdf5 file. Run the script with the `-h` flag for instructions. This is by far the least efficient part of the process. Note that this script relies on the `h5py_cache` which is available via pip.
 
 ### Using an Image Stack
 The file `image_stack.py` contains a class for accessing the image stack you have generated. See the documentation for the various member functions. For example, extracting a time series for a given decimal RA and Dec is as simple as:
