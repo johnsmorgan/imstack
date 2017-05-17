@@ -7,7 +7,7 @@ This software has been written for IPS studies with the MWA. It is currently lim
 
 ## Usage
 ### Make Image Stack
-The script `make_imstack.py` can be used to read the fits files into the hdf5 file. Run the script with the `-h` flag for instructions. This is by far the least efficient part of the process. Note that this script relies on the `h5py_cache` which is available via pip.
+The script `make_imstack.py` can be used to read the fits files into the hdf5 file. Run the script with the `-h` flag for instructions. This is by far the least efficient part of the process. Note that this script relies on the [`h5py_cache`](https://github.com/moble/h5py_cache) which is available via pip.
 
 ### Using an Image Stack
 The file `image_stack.py` contains a class for accessing the image stack you have generated. See the documentation for the various member functions. For example, extracting a time series for a given decimal RA and Dec is as simple as:
