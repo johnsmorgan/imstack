@@ -4,7 +4,7 @@ import numpy as np
 from optparse import OptionParser #NB zeus does not have argparse!
 from astropy.io import fits
 
-from h5pycache import File
+from h5py_cache import File
 
 VERSION = "0.1"
 CACHE_SIZE=30 #GB
