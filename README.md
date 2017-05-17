@@ -1,5 +1,5 @@
 ## Overview 
-Take a set of fits images (which share a World Coordinate system, but span different timesteps, spectral channels, or polarisations) and write the results into an hdf5 file which is disk-space-efficient, stores all relevant metadata, and is optimised for efficient extraction of timeseries (lightcurve) data.
+Take a set of fits images (which share a World Coordinate System, but span different timesteps, spectral channels, or polarisations) and write the results into an HDF5 file which is disk-space-efficient, stores all relevant metadata, and is optimised for efficient extraction of timeseries (lightcurve) data.
 
 ## Known issues
 
@@ -11,6 +11,7 @@ The script `make_imstack.py` can be used to read the fits files into the hdf5 fi
 
 ### Using an Image Stack
 The file `image_stack.py` contains a class for accessing the image stack you have generated. See the documentation for the various member functions. For example, extracting a time series for a given decimal RA and Dec is as simple as:
+
     from image_stack import ImageStack
     imstack = ImageStack("my_hdf5_file.hdf5")
     imstack.world2ts(112.334341, +5.32321)
