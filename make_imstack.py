@@ -71,7 +71,7 @@ else:
 
 for band in opts.bands:
     for suffix in opts.suffixes:
-        for t in xrange(TIME_INDEX, N_TIMESTEPS+TIME_INDEX):
+        for t in xrange(TIME_INDEX, opts.n+TIME_INDEX):
             for p in opts.pols:
                 if band is None:
                     infile = FILENAME.format(obsid=obsid, time=t, pol=p, suffix=suffix)
@@ -95,7 +95,7 @@ with File(opts.outfile, file_mode, 0.9*CACHE_SIZE*1024**3, 1) as df:
         else:
             logging.warn("Warning, overwriting existing band %s", band)
             group = df[band]
-        group.attrs['TIME_INTERVAL'] = TIME_INTERVAL
+        group.attrs['TIME_INTERVAL'] = opts.step
 
         # determine data size and structure 
         if band is '/':
@@ -105,8 +105,8 @@ with File(opts.outfile, file_mode, 0.9*CACHE_SIZE*1024**3, 1) as df:
         hdus = fits.open(image_file, memmap=True)
         image_size = hdus[HDU].data.shape[-1]
         assert image_size % opts.stamp_size== 0, "image_size must be divisible by stamp_size"
-        data_shape = [len(opts.pols), image_size, image_size, N_CHANNELS, N_TIMESTEPS]
-        chunks = (len(opts.pols), opts.stamp_size, opts.stamp_size, N_CHANNELS, N_TIMESTEPS)
+        data_shape = [len(opts.pols), image_size, image_size, N_CHANNELS, opts.n]
+        chunks = (len(opts.pols), opts.stamp_size, opts.stamp_size, N_CHANNELS, opts.n)
 
         beam_shape = data_shape[:-1] + [1] # just one beam for all timesteps for now
         beam = group.create_dataset("beam", beam_shape, dtype=np.float32, compression='gzip', shuffle=True)
@@ -125,8 +125,8 @@ with File(opts.outfile, file_mode, 0.9*CACHE_SIZE*1024**3, 1) as df:
             logging.warn("NaNs in primary beam")
 
         # write main header information
-        timesteps = group.create_dataset("WSCTIMES", (N_TIMESTEPS,), dtype=np.uint16)
-        timesteps2 = group.create_dataset("WSCTIMEE", (N_TIMESTEPS,), dtype=np.uint16)
+        timesteps = group.create_dataset("WSCTIMES", (opts.n,), dtype=np.uint16)
+        timesteps2 = group.create_dataset("WSCTIMEE", (opts.n,), dtype=np.uint16)
         if band is '/':
             header_file = FILENAME.format(obsid=obsid, time=HEADER_INDEX, pol=opts.pols[0], suffix=opts.suffixes[0])
         else:
@@ -140,12 +140,12 @@ with File(opts.outfile, file_mode, 0.9*CACHE_SIZE*1024**3, 1) as df:
         for s, suffix in enumerate(opts.suffixes):
             # gzip is rather slower than lzf, but is more standard in hdf5. Will allow dumping to h5dump etc.
             data = group.create_dataset(suffix, data_shape, chunks=chunks, dtype=DTYPE, compression='gzip', shuffle=True)
-            filenames = group.create_dataset("%s_filenames" % suffix, (len(opts.pols), N_CHANNELS, N_TIMESTEPS), dtype="S%d" % len(header_file), compression='gzip')
+            filenames = group.create_dataset("%s_filenames" % suffix, (len(opts.pols), N_CHANNELS, opts.n), dtype="S%d" % len(header_file), compression='gzip')
         
             n_rows = image_size/opts.n_pass
             for i in range(opts.n_pass):
                 logging.info("processing segment %d/%d" % (i+1, opts.n_pass))
-                for t in xrange(N_TIMESTEPS):
+                for t in xrange(opts.n):
                     im_slice = [slice(n_rows*i, n_rows*(i+1)), slice(None, None, None)]
                     fits_slice = SLICE[:-2] + im_slice
 
@@ -169,5 +169,5 @@ with File(opts.outfile, file_mode, 0.9*CACHE_SIZE*1024**3, 1) as df:
                             timesteps2[t] = hdus[0].header['WSCTIMEE']
                         else:
                             # NB these are *not* enforced across different frequency bands, but these could, in principle, have different TIME_INTERVALS
-                            assert timesteps[t] == hdus[0].header['WSCTIMES'], "Timesteps do not match %s in %s" % (SUFFIXES[0], infile)
-                            assert timesteps2[t] == hdus[0].header['WSCTIMEE'], "Timesteps do not match %s in %s" % (SUFFIXES[0], infile)
+                            assert timesteps[t] == hdus[0].header['WSCTIMES'], "Timesteps do not match %s in %s" % (opts.suffixes[0], infile)
+                            assert timesteps2[t] == hdus[0].header['WSCTIMEE'], "Timesteps do not match %s in %s" % (opts.suffixes[0], infile)
