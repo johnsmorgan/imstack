@@ -17,7 +17,7 @@ The file `image_stack.py` contains a class for accessing the image stack you hav
     imstack.world2ts(112.334341, +5.32321)
 
 ### Generating a summary image
-The script make_moment.py gives an example of extracting a summary image (or images) of each pixel. In this case, generating mean, standard deviation and higher moments of the time series with high- and low-pass filters optionally applied. `mpi4py` is used for parallelisation. Run the script with the `-h' flag for instructions.
+The script `make_moment.py` gives an example of extracting a summary image (or images) of each pixel. In this case, generating mean, standard deviation and higher moments of the time series with high- and low-pass filters optionally applied. `mpi4py` is used for parallelisation. Run the script with the `-h` flag for instructions.
 
 ## Credit
 
