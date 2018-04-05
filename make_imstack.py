@@ -11,7 +11,6 @@ CACHE_SIZE=30 #GB
 N_PASS=1
 TIME_INTERVAL=0.5
 TIME_INDEX=1
-HEADER_INDEX=100
 POLS = 'XX,YY'
 STAMP_SIZE=16
 SLICE = [0, 0, slice(None, None, None), slice(None, None, None)]
@@ -128,9 +127,9 @@ with File(opts.outfile, file_mode, 0.9*CACHE_SIZE*1024**3, 1) as df:
         timesteps = group.create_dataset("WSCTIMES", (opts.n,), dtype=np.uint16)
         timesteps2 = group.create_dataset("WSCTIMEE", (opts.n,), dtype=np.uint16)
         if band is '/':
-            header_file = FILENAME.format(obsid=obsid, time=HEADER_INDEX, pol=opts.pols[0], suffix=opts.suffixes[0])
+            header_file = FILENAME.format(obsid=obsid, time=opts.n//2, pol=opts.pols[0], suffix=opts.suffixes[0])
         else:
-            header_file = FILENAME_BAND.format(obsid=obsid, band=band, time=HEADER_INDEX, pol=opts.pols[0], suffix=opts.suffixes[0])
+            header_file = FILENAME_BAND.format(obsid=obsid, band=band, time=opts.n//2, pol=opts.pols[0], suffix=opts.suffixes[0])
         # add fits header to attributes
         hdus = fits.open(header_file, memmap=True)
         header = group.create_dataset('header', data=[], dtype=DTYPE)
