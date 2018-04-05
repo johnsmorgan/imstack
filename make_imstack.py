@@ -31,6 +31,7 @@ parser = OptionParser(usage = "usage: obsid" +
     Convert a set of wsclean images into an hdf5 image cube
 """)
 parser.add_option("-n", default=N_TIMESTEPS, dest="n", type="int", help="number of timesteps to process [default: %default]")
+parser.add_option("--start", default=TIME_INDEX, dest="start", type="int", help="starting time index [default: %default]")
 parser.add_option("--n_pass", default=N_PASS, dest="n_pass", type="int", help="number of passes [default: %default]")
 parser.add_option("--step", default=TIME_INTERVAL, dest="step", type="float", help="time between timesteps [default: %default]")
 parser.add_option("--outfile", default=None, dest="outfile", type="str", help="outfile [default: [obsid].hdf5]")
@@ -70,7 +71,7 @@ else:
 
 for band in opts.bands:
     for suffix in opts.suffixes:
-        for t in xrange(TIME_INDEX, opts.n+TIME_INDEX):
+        for t in xrange(opts.start, opts.n+opts.start):
             for p in opts.pols:
                 if band is None:
                     infile = FILENAME.format(obsid=obsid, time=t, pol=p, suffix=suffix)
@@ -98,9 +99,9 @@ with File(opts.outfile, file_mode, 0.9*CACHE_SIZE*1024**3, 1) as df:
 
         # determine data size and structure 
         if band is '/':
-            image_file = FILENAME.format(obsid=obsid, time=TIME_INDEX, pol=opts.pols[0], suffix=opts.suffixes[0])
+            image_file = FILENAME.format(obsid=obsid, time=opts.start, pol=opts.pols[0], suffix=opts.suffixes[0])
         else:
-            image_file = FILENAME_BAND.format(obsid=obsid, band=band, time=TIME_INDEX, pol=opts.pols[0], suffix=opts.suffixes[0])
+            image_file = FILENAME_BAND.format(obsid=obsid, band=band, time=opts.start, pol=opts.pols[0], suffix=opts.suffixes[0])
         hdus = fits.open(image_file, memmap=True)
         image_size = hdus[HDU].data.shape[-1]
         assert image_size % opts.stamp_size== 0, "image_size must be divisible by stamp_size"
@@ -151,9 +152,9 @@ with File(opts.outfile, file_mode, 0.9*CACHE_SIZE*1024**3, 1) as df:
                     for p, pol in enumerate(opts.pols):
 
                         if band is None:
-                            infile = FILENAME.format(obsid=obsid, time=t+TIME_INDEX, pol=pol, suffix=suffix)
+                            infile = FILENAME.format(obsid=obsid, time=t+opts.start, pol=pol, suffix=suffix)
                         else:
-                            infile = FILENAME_BAND.format(obsid=obsid, band=band, time=t+TIME_INDEX, pol=pol, suffix=suffix)
+                            infile = FILENAME_BAND.format(obsid=obsid, band=band, time=t+opts.start, pol=pol, suffix=suffix)
                         logging.info(" processing %s", infile)
                         hdus = fits.open(infile, memmap=True)
                         filenames[p, 0, t] = infile
