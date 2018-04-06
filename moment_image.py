@@ -43,8 +43,13 @@ parser.add_option("--stop", default=584, dest="stop", type="int", help="stop tim
 opts, args = parser.parse_args()
 hdf5_in= args[0]
 basename = os.path.splitext(hdf5_in)
-freq = args[1]
 timesteps = [opts.start, opts.stop]
+
+if opts.freq is not None:
+    group = opts.freq
+else:
+    group = '/'
+
 
 # MPI initialisation and standard parameters
 
@@ -65,13 +70,13 @@ def index_to_chunk(index, chunk_x, data_x, chunk_y, data_y):
     y_index = index//(data_x//chunk_x)
     return slice(x_index*chunk_x, (x_index+1)*chunk_x), slice(y_index*chunk_y, (y_index+1)*chunk_y)
 
-imstack = ImageStack(hdf5_in, freq=freq, steps=timesteps)
+imstack = ImageStack(hdf5_in, freq=opts.freq, steps=timesteps)
 if os.path.exists(HDF5_OUT % (basename, opts.suffix)):
     with h5py.File(HDF5_OUT % (basename, opts.suffix)) as df:
-        assert not freq in df.keys(), "output hdf5 file already contains this %s" % freq
+        assert not group in df.keys(), "output hdf5 file already contains this %s" % opts.freq
     
 for i in range(N_MOMENTS):
-    out_fits = FITS_OUT % (basename, freq, opts.suffix, i)
+    out_fits = FITS_OUT % (basename, opts.freq if opts.freq is not None else "", opts.suffix, i)
     assert os.path.exists(out_fits) is False, "output fits file %s exists" % out_fits
 
 chunk_x = imstack.data.chunks[2]
@@ -101,9 +106,9 @@ if rank == 0:
     # write out moments in hdf5 file
     with h5py.File(os.path.join(HDF5_DIR, HDF5_OUT % (basename, opts.suffix))) as df:
         df.attrs['VERSION'] = VERSION
-        if not freq in df.keys():
-            df.create_group(freq)
-        moments = df[freq].create_dataset("moments", (data_y, data_x, 1, N_MOMENTS), dtype=np.float32, compression='gzip', shuffle=True)
+        if opts.freq is not None:
+            df.create_group(group)
+        moments = df[group].create_dataset("moments", (data_y, data_x, 1, N_MOMENTS), dtype=np.float32, compression='gzip', shuffle=True)
         moments[:, :, 0, :] = out_data
         if opts.filter_lo:
             moments.attrs['FILTER_LO_FILTER'] = FILTER.__name__
@@ -115,9 +120,9 @@ if rank == 0:
             moments.attrs['FILTER_HI_CUTOFF'] = FILTER_HI_CUTOFF
 
         # provide links to time-series file
-        df[freq]['beam'] = h5py.ExternalLink(hdf5_in, imstack.group['beam'].name)
-        df[freq][imstack.image_type] = h5py.ExternalLink(hdf5_in, imstack.data.name)
-        df[freq]['header'] = h5py.ExternalLink(hdf5_in, imstack.group['header'].name)
+        df[group]['beam'] = h5py.ExternalLink(hdf5_in, imstack.group['beam'].name)
+        df[group][imstack.image_type] = h5py.ExternalLink(hdf5_in, imstack.data.name)
+        df[group]['header'] = h5py.ExternalLink(hdf5_in, imstack.group['header'].name)
 
     # write out fits files
     for i in range(N_MOMENTS):
@@ -133,7 +138,7 @@ if rank == 0:
             hdu.header['HIFILT'] = FILTER_HI.__name__
             hdu.header['HIORDER'] = FILTER_HI_ORDER
             hdu.header['HICUTOFF'] = FILTER_HI_CUTOFF
-        hdu.writeto(FITS_OUT % (obsid, freq, opts.suffix, i+1))
+        hdu.writeto(FITS_OUT % (obsid, opts.freq if opts.freq is not None else "", opts.suffix, i+1))
     print "Master done"
 else:
     indexes = range(rank-1, total_chunks, size-1)
