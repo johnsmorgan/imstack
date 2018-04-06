@@ -41,7 +41,7 @@ parser.add_option("--start", default=8, dest="start", type="int", help="start ti
 parser.add_option("--stop", default=584, dest="stop", type="int", help="stop timestep")
 
 opts, args = parser.parse_args()
-hdf5_in= int(args[0])
+hdf5_in= args[0]
 basename = os.path.splitext(hdf5_in)
 freq = args[1]
 timesteps = [opts.start, opts.stop]
