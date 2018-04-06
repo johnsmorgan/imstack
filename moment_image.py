@@ -76,7 +76,7 @@ if os.path.exists(HDF5_OUT % (basename, opts.suffix)):
         assert not group in df.keys(), "output hdf5 file already contains this %s" % opts.freq
     
 for i in range(N_MOMENTS):
-    out_fits = FITS_OUT % (basename, opts.freq if opts.freq is not None else "", opts.suffix, i)
+    out_fits = FITS_OUT % (basename, opts.freq if opts.freq is not None else "", opts.suffix, i+1)
     assert os.path.exists(out_fits) is False, "output fits file %s exists" % out_fits
 
 chunk_x = imstack.data.chunks[2]
@@ -138,7 +138,7 @@ if rank == 0:
             hdu.header['HIFILT'] = FILTER_HI.__name__
             hdu.header['HIORDER'] = FILTER_HI_ORDER
             hdu.header['HICUTOFF'] = FILTER_HI_CUTOFF
-        hdu.writeto(FITS_OUT % (obsid, opts.freq if opts.freq is not None else "", opts.suffix, i+1))
+        hdu.writeto(FITS_OUT % (basename, opts.freq if opts.freq is not None else "", opts.suffix, i+1))
     print "Master done"
 else:
     indexes = range(rank-1, total_chunks, size-1)
