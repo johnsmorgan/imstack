@@ -104,7 +104,7 @@ if rank == 0:
                                                                   str(sum(completed)).rjust(tag_pad),
                                                                   total_chunks)
     # write out moments in hdf5 file
-    with h5py.File(os.path.join(HDF5_DIR, HDF5_OUT % (basename, opts.suffix))) as df:
+    with h5py.File(HDF5_OUT % (basename, opts.suffix)) as df:
         df.attrs['VERSION'] = VERSION
         if opts.freq is not None:
             df.create_group(group)
