@@ -88,8 +88,7 @@ with File(opts.outfile, file_mode, 0.9*CACHE_SIZE*1024**3, 1) as df:
 
     for band in opts.bands:
         if band is None:
-            band = '/'
-            group = df[band]
+            group = df['/']
         elif not band in df.keys():
             group = df.create_group(band)
         else:
@@ -98,7 +97,7 @@ with File(opts.outfile, file_mode, 0.9*CACHE_SIZE*1024**3, 1) as df:
         group.attrs['TIME_INTERVAL'] = opts.step
 
         # determine data size and structure 
-        if band is '/':
+        if band is None:
             image_file = FILENAME.format(obsid=obsid, time=opts.start, pol=opts.pols[0], suffix=opts.suffixes[0])
         else:
             image_file = FILENAME_BAND.format(obsid=obsid, band=band, time=opts.start, pol=opts.pols[0], suffix=opts.suffixes[0])
@@ -111,7 +110,7 @@ with File(opts.outfile, file_mode, 0.9*CACHE_SIZE*1024**3, 1) as df:
         beam_shape = data_shape[:-1] + [1] # just one beam for all timesteps for now
         beam = group.create_dataset("beam", beam_shape, dtype=np.float32, compression='gzip', shuffle=True)
         for p, pol in enumerate(opts.pols):
-            if band is '/':
+            if band is None:
                 hdus = fits.open(PB_FILE.format(obsid=obsid, pol=pol), memmap=True)
             else:
                 hdus = fits.open(PB_FILE_BAND.format(obsid=obsid, band=band, pol=pol), memmap=True)
@@ -127,7 +126,7 @@ with File(opts.outfile, file_mode, 0.9*CACHE_SIZE*1024**3, 1) as df:
         # write main header information
         timesteps = group.create_dataset("WSCTIMES", (opts.n,), dtype=np.uint16)
         timesteps2 = group.create_dataset("WSCTIMEE", (opts.n,), dtype=np.uint16)
-        if band is '/':
+        if band is None:
             header_file = FILENAME.format(obsid=obsid, time=opts.n//2, pol=opts.pols[0], suffix=opts.suffixes[0])
         else:
             header_file = FILENAME_BAND.format(obsid=obsid, band=band, time=opts.n//2, pol=opts.pols[0], suffix=opts.suffixes[0])
