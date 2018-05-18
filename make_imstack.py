@@ -40,7 +40,9 @@ parser.add_option("--bands", default=None, dest="bands", type="str", help="comma
 parser.add_option("--pols", default=POLS, dest="pols", type="str", help="comma-separated list of pols [default: %default]")
 parser.add_option("--pb_thresh", default=PB_THRESHOLD, dest="pb_thresh", type="float", help="flag below this threshold [default: %default]")
 parser.add_option("--stamp_size", default=STAMP_SIZE, dest="stamp_size", type="int", help="hdf5 stamp size [default: %default]")
+parser.add_option("--skip_check_wsc_timesteps", action="store_true", dest="skip_check_wcs_timesteps", help="don't check WSClean timesteps")
 parser.add_option("-v", "--verbose", action="count", dest="verbose", help="-v info, -vv debug")
+
 opts, args = parser.parse_args()
 
 if not len(args) == 1:
@@ -68,6 +70,9 @@ if opts.bands is None:
     opts.bands = [None]
 else:
     opts.bands = opts.bands.split(',')
+
+if opts.skip_check_wcs_timesteps:
+    logging.warn("Warning: not checking timesteps. Checking verbose output carefully is recommended!")
 
 for band in opts.bands:
     for suffix in opts.suffixes:
@@ -168,5 +173,9 @@ with File(opts.outfile, file_mode, 0.9*CACHE_SIZE*1024**3, 1) as df:
                             timesteps2[t] = hdus[0].header['WSCTIMEE']
                         else:
                             # NB these are *not* enforced across different frequency bands, but these could, in principle, have different TIME_INTERVALS
-                            assert timesteps[t] == hdus[0].header['WSCTIMES'], "Timesteps do not match %s in %s" % (opts.suffixes[0], infile)
-                            assert timesteps2[t] == hdus[0].header['WSCTIMEE'], "Timesteps do not match %s in %s" % (opts.suffixes[0], infile)
+                            if not opts.skip_check_wcs_timesteps:
+                                assert timesteps[t] == hdus[0].header['WSCTIMES'], "Timesteps do not match %s in %s" % (opts.suffixes[0], infile)
+                                assert timesteps2[t] == hdus[0].header['WSCTIMEE'], "Timesteps do not match %s in %s" % (opts.suffixes[0], infile)
+                            else:
+                                logging.debug(hdus[0].header['DATE-OBS'])
+                                logging.debug(hdus[0].header['DATE-OBS'])
