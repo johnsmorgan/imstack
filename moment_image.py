@@ -43,7 +43,6 @@ parser.add_option("--stop", default=584, dest="stop", type="int", help="stop tim
 opts, args = parser.parse_args()
 hdf5_in= args[0]
 basename = os.path.splitext(hdf5_in)[0]
-freq = args[1]
 timesteps = [opts.start, opts.stop]
 
 if opts.freq is not None:
