@@ -121,7 +121,7 @@ class ImageStack(object):
         else:
             return beam
 
-    def world2beam(self, x, y, avg_pol=True):
+    def world2beam(self, ra, dec, avg_pol=True):
         """
         get beam corresponding to ra,dec
         """
