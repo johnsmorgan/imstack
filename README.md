@@ -21,7 +21,7 @@ The script `make_moment.py` gives an example of extracting a summary image (or i
 
 ## Credit
 
-Please cite [Morgan et al. (2018)](http://adsabs.harvard.edu/abs/2018MNRAS.473.2965M) if you make use of this software for research purposes.
+Please cite [Morgan et al. (2018)](http://adsabs.harvard.edu/abs/2018MNRAS.473.2965M) if you make use of this software for research purposes. Further details on imstack are available in the appendix of this paper.
 
 ## Prerequisites
 
