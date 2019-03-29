@@ -39,7 +39,7 @@ parser.add_option("--bands", default=None, dest="bands", type="str", help="comma
 parser.add_option("--pols", default=POLS, dest="pols", type="str", help="comma-separated list of pols [default: %default]")
 parser.add_option("--pb_thresh", default=PB_THRESHOLD, dest="pb_thresh", type="float", help="flag below this threshold [default: %default]")
 parser.add_option("--stamp_size", default=STAMP_SIZE, dest="stamp_size", type="int", help="hdf5 stamp size [default: %default]")
-parser.add_option("--skip_check_wsc_timesteps", action="store_true", dest="skip_check_wcs_timesteps", help="don't check WSClean timesteps")
+parser.add_option("--old_wsc_timesteps", action="store_true", dest="old_wcs_timesteps", help="use old WSClean timesteps to check files")
 parser.add_option("-v", "--verbose", action="count", dest="verbose", help="-v info, -vv debug")
 
 opts, args = parser.parse_args()
@@ -70,8 +70,8 @@ if opts.bands is None:
 else:
     opts.bands = opts.bands.split(',')
 
-if opts.skip_check_wcs_timesteps:
-    logging.warn("Warning: not checking timesteps. Checking verbose output carefully is recommended!")
+if opts.old_wcs_timesteps:
+    logging.warn("Warning: using old WSC timesteps. Not recommended, even for old WSClean images!")
 
 for band in opts.bands:
     for suffix in opts.suffixes:
