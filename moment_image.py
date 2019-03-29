@@ -39,6 +39,7 @@ parser.add_option("--pbcor", action="store_true", dest="pbcor", help="apply prim
 parser.add_option("--suffix", default='', dest="suffix", type="string", help="")
 parser.add_option("--start", default=8, dest="start", type="int", help="start timestep")
 parser.add_option("--stop", default=584, dest="stop", type="int", help="stop timestep")
+parser.add_option("--keep_zeros", action="store_true", dest="keep_zeros", help="unless overridden with this flag, central pixel is checked for exact zeros and these timesteps are excised.")
 
 opts, args = parser.parse_args()
 hdf5_in= args[0]
@@ -146,6 +147,9 @@ else:
     data = np.zeros((chunk_y, chunk_x, N_MOMENTS))
     # this should minimise disk reads by reading adjacent parts of the file at approximately the same time
     # i.e. processes 1-N will read chunks 1-N at about the same time
+    if not opts.keep_zeros:
+        zero_filter = np.argwhere(imstack.pix2ts[data_x//2, data_y//2] == 0.0))
+        print "Worker rank {} found {} zero timesteps: ".format(rank, len(zero_filter)) + str(zero_filter)
     for index in indexes:
         slice_x, slice_y = index_to_chunk(index, chunk_x, data_x, chunk_y, data_y)
         #                            NB switched order below
@@ -153,6 +157,8 @@ else:
             ts_data = imstack.slice2cube(slice_x, slice_y, correct=opts.pbcor)
         except ZeroDivisionError:
             ts_data = np.nan*np.ones((chunk_y, chunk_x, 20))
+        if not opts.keep_zeros:
+            ts_data = np.delete(ts_data, zero_filter, axis=2)
         # mean
         data[..., 0] = np.average(ts_data, axis=2)
         if N_MOMENTS > 2:
