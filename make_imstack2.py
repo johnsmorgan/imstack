@@ -4,7 +4,8 @@ import numpy as np
 from optparse import OptionParser #NB zeus does not have argparse!
 from astropy.io import fits
 
-VERSION = "0.1"
+VERSION = "0.2"
+#changes from 0.1: lzf instead of gzip, support new wsclean which does not have WSCTIMES and WSCTIMEE
 CACHE_SIZE = 1024 #MB
 N_PASS = 1
 TIME_INTERVAL = 0.5
@@ -118,7 +119,7 @@ for band in opts.bands:
     chunks = (len(opts.pols), opts.stamp_size, opts.stamp_size, N_CHANNELS, opts.n)
 
     beam_shape = data_shape[:-1] + [1] # just one beam for all timesteps for now
-    beam = group.create_dataset("beam", beam_shape, dtype=np.float32, compression='gzip', shuffle=True)
+    beam = group.create_dataset("beam", beam_shape, dtype=np.float32, compression='lzf', shuffle=True)
     for p, pol in enumerate(opts.pols):
         if band is None:
             hdus = fits.open(PB_FILE.format(obsid=obsid, pol=pol), memmap=True)
@@ -134,8 +135,9 @@ for band in opts.bands:
         logging.warn("NaNs in primary beam")
 
     # write main header information
-    timesteps = group.create_dataset("WSCTIMES", (opts.n,), dtype=np.uint16)
-    timesteps2 = group.create_dataset("WSCTIMEE", (opts.n,), dtype=np.uint16)
+    timestep_start = group.create_dataset("timestep_start", (opts.n,), dtype=np.uint16)
+    timestep_stop = group.create_dataset("timestep_stop", (opts.n,), dtype=np.uint16)
+    timestamp = group.create_dataset("timestamp", (opts.n,), dtype="S21")
     if band is None:
         header_file = FILENAME.format(obsid=obsid, time=opts.n//2, pol=opts.pols[0], suffix=opts.suffixes[0])
     else:
@@ -147,9 +149,8 @@ for band in opts.bands:
         header.attrs[key] = item
 
     for s, suffix in enumerate(opts.suffixes):
-        # gzip is rather slower than lzf, but is more standard in hdf5. Will allow dumping to h5dump etc.
-        data = group.create_dataset(suffix, data_shape, chunks=chunks, dtype=DTYPE, compression='gzip', shuffle=True)
-        filenames = group.create_dataset("%s_filenames" % suffix, (len(opts.pols), N_CHANNELS, opts.n), dtype="S%d" % len(header_file), compression='gzip')
+        data = group.create_dataset(suffix, data_shape, chunks=chunks, dtype=DTYPE, compression='lzf', shuffle=True)
+        filenames = group.create_dataset("%s_filenames" % suffix, (len(opts.pols), N_CHANNELS, opts.n), dtype="S%d" % len(header_file), compression='lzf')
 
         n_rows = image_size/opts.n_pass
         for i in range(opts.n_pass):
@@ -174,17 +175,13 @@ for band in opts.bands:
                                                                        hdus[0].data[fits_slice],
                                                                        np.nan)*pb_nan[n_rows*i:n_rows*(i+1), :, 0, 0]
 
-                    if s == 0 and p == 0 and not opts.skip_check_wcs_timesteps:
-                        timesteps[t] = hdus[0].header['WSCTIMES']
-                        timesteps2[t] = hdus[0].header['WSCTIMEE']
-                    elif s == 0 and p == 0 and opts.skip_check_wcs_timesteps:
-                        timesteps[t] = t
-                        timesteps2[t] = t+1
-                    else:
-                        # NB these are *not* enforced across different frequency bands, but these could, in principle, have different TIME_INTERVALS
-                        if not opts.skip_check_wcs_timesteps:
-                            assert timesteps[t] == hdus[0].header['WSCTIMES'], "Timesteps do not match %s in %s" % (opts.suffixes[0], infile)
-                            assert timesteps2[t] == hdus[0].header['WSCTIMEE'], "Timesteps do not match %s in %s" % (opts.suffixes[0], infile)
+                    if s == 0 and p == 0:
+                        timestamp[t] = hdus[0].header['DATE-OBS']
+                        if opts.old_wcs_timesteps:
+                            timestep_start[t] = hdus[0].header['WSCTIMES']
+                            timestep_stop[t] = hdus[0].header['WSCTIMEE']
                         else:
-                            logging.debug(hdus[0].header['DATE-OBS'])
-                            logging.debug(hdus[0].header['DATE-OBS'])
+                            timestep_start[t] = t
+                            timestep_stop[t] = t+1
+                    else:
+                        assert timestamp[t] == hdus[0].header['DATE-OBS'], "Timesteps do not match %s in %s" % (opts.suffixes[0], infile)
