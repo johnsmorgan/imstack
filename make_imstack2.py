@@ -173,9 +173,13 @@ for band in opts.bands:
                     data[p, n_rows*i:n_rows*(i+1), :, 0, t] = np.where(pb_mask[n_rows*i:n_rows*(i+1), :, 0, 0],
                                                                        hdus[0].data[fits_slice],
                                                                        np.nan)*pb_nan[n_rows*i:n_rows*(i+1), :, 0, 0]
-                    if s == 0 and p == 0:
+
+                    if s == 0 and p == 0 and not opts.skip_check_wcs_timesteps:
                         timesteps[t] = hdus[0].header['WSCTIMES']
                         timesteps2[t] = hdus[0].header['WSCTIMEE']
+                    elif s == 0 and p == 0 and opts.skip_check_wcs_timesteps:
+                        timesteps[t] = t
+                        timesteps2[t] = t+1
                     else:
                         # NB these are *not* enforced across different frequency bands, but these could, in principle, have different TIME_INTERVALS
                         if not opts.skip_check_wcs_timesteps:
