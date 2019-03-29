@@ -4,32 +4,30 @@ import numpy as np
 from optparse import OptionParser #NB zeus does not have argparse!
 from astropy.io import fits
 
-from h5py_cache import File
-
 VERSION = "0.1"
-CACHE_SIZE= 1024 #MB
-N_PASS=1
-TIME_INTERVAL=0.5
-TIME_INDEX=1
+CACHE_SIZE = 1024 #MB
+N_PASS = 1
+TIME_INTERVAL = 0.5
+TIME_INDEX = 1
 POLS = 'XX,YY'
-STAMP_SIZE=16
+STAMP_SIZE = 16
 SLICE = [0, 0, slice(None, None, None), slice(None, None, None)]
 HDU = 0
 PB_THRESHOLD = 0.1 # fraction of pbmax
 #SUFFIXES=["image", "model", "dirty"]
-SUFFIXES="image,model"
-N_TIMESTEPS=591
-N_CHANNELS=1
+SUFFIXES = "image,model"
+N_TIMESTEPS = 591
+N_CHANNELS = 1
 DTYPE = np.float16
-FILENAME="{obsid}-t{time:04d}-{pol}-{suffix}.fits"
-FILENAME_BAND="{obsid}_{band}-t{time:04d}-{pol}-{suffix}.fits"
-PB_FILE="{obsid}-{pol}-beam.fits"
-PB_FILE_BAND="{obsid}_{band}-{pol}-beam.fits"
+FILENAME = "{obsid}-t{time:04d}-{pol}-{suffix}.fits"
+FILENAME_BAND = "{obsid}_{band}-t{time:04d}-{pol}-{suffix}.fits"
+PB_FILE = "{obsid}-{pol}-beam.fits"
+PB_FILE_BAND = "{obsid}_{band}-{pol}-beam.fits"
 
-parser = OptionParser(usage = "usage: obsid" +
-"""
-    Convert a set of wsclean images into an hdf5 image cube
-""")
+parser = OptionParser(usage="usage: obsid" +
+                      """
+                          Convert a set of wsclean images into an hdf5 image cube
+                      """)
 parser.add_option("-n", default=N_TIMESTEPS, dest="n", type="int", help="number of timesteps to process [default: %default]")
 parser.add_option("--start", default=TIME_INDEX, dest="start", type="int", help="starting time index [default: %default]")
 parser.add_option("--n_pass", default=N_PASS, dest="n_pass", type="int", help="number of passes [default: %default]")
@@ -45,7 +43,7 @@ parser.add_option("-v", "--verbose", action="count", dest="verbose", help="-v in
 
 opts, args = parser.parse_args()
 
-if not len(args) == 1:
+if len(args) != 1:
     parser.error("incorrect number of arguments")
 
 obsid = int(args[0])
@@ -92,8 +90,7 @@ settings[2] *= CACHE_SIZE
 propfaid.set_cache(*settings)
 
 with contextlib.closing(h5py.h5f.create(opts.outfile, fapl=propfaid)) as fid:
-     df = h5py.File(fid,file_mode)
-
+    df = h5py.File(fid, file_mode)
 
 df.attrs['VERSION'] = VERSION
 df.attrs['USER'] = os.environ['USER']
@@ -102,21 +99,21 @@ df.attrs['DATE_CREATED'] = datetime.datetime.utcnow().isoformat()
 for band in opts.bands:
     if band is None:
         group = df['/']
-    elif not band in df.keys():
+    elif band not in df.keys():
         group = df.create_group(band)
     else:
         logging.warn("Warning, overwriting existing band %s", band)
         group = df[band]
     group.attrs['TIME_INTERVAL'] = opts.step
 
-    # determine data size and structure 
+    # determine data size and structure
     if band is None:
         image_file = FILENAME.format(obsid=obsid, time=opts.start, pol=opts.pols[0], suffix=opts.suffixes[0])
     else:
         image_file = FILENAME_BAND.format(obsid=obsid, band=band, time=opts.start, pol=opts.pols[0], suffix=opts.suffixes[0])
     hdus = fits.open(image_file, memmap=True)
     image_size = hdus[HDU].data.shape[-1]
-    assert image_size % opts.stamp_size== 0, "image_size must be divisible by stamp_size"
+    assert image_size % opts.stamp_size == 0, "image_size must be divisible by stamp_size"
     data_shape = [len(opts.pols), image_size, image_size, N_CHANNELS, opts.n]
     chunks = (len(opts.pols), opts.stamp_size, opts.stamp_size, N_CHANNELS, opts.n)
 
@@ -153,7 +150,7 @@ for band in opts.bands:
         # gzip is rather slower than lzf, but is more standard in hdf5. Will allow dumping to h5dump etc.
         data = group.create_dataset(suffix, data_shape, chunks=chunks, dtype=DTYPE, compression='gzip', shuffle=True)
         filenames = group.create_dataset("%s_filenames" % suffix, (len(opts.pols), N_CHANNELS, opts.n), dtype="S%d" % len(header_file), compression='gzip')
-    
+
         n_rows = image_size/opts.n_pass
         for i in range(opts.n_pass):
             logging.info("processing segment %d/%d" % (i+1, opts.n_pass))
@@ -176,7 +173,7 @@ for band in opts.bands:
                     data[p, n_rows*i:n_rows*(i+1), :, 0, t] = np.where(pb_mask[n_rows*i:n_rows*(i+1), :, 0, 0],
                                                                        hdus[0].data[fits_slice],
                                                                        np.nan)*pb_nan[n_rows*i:n_rows*(i+1), :, 0, 0]
-                    if s==0 and p==0:
+                    if s == 0 and p == 0:
                         timesteps[t] = hdus[0].header['WSCTIMES']
                         timesteps2[t] = hdus[0].header['WSCTIMEE']
                     else:
