@@ -49,9 +49,9 @@ if len(args) != 1:
 obsid = int(args[0])
 
 if opts.verbose == 1:
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 elif opts.verbose > 1:
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
 
 if opts.outfile is None:
     opts.outfile = "%d.hdf5" % obsid
@@ -152,6 +152,8 @@ for band in opts.bands:
         data = np.empty(data_shape, dtype=DTYPE)
         filenames = group.create_dataset("%s_filenames" % suffix, (len(opts.pols), N_CHANNELS, opts.n), dtype="S%d" % len(header_file), compression='lzf')
 
+        n_rows = image_size
+        i=0
         for t in xrange(opts.n):
             im_slice = [slice(n_rows*i, n_rows*(i+1)), slice(None, None, None)]
             fits_slice = SLICE[:-2] + im_slice
@@ -165,9 +167,6 @@ for band in opts.bands:
                 logging.info(" processing %s", infile)
                 hdus = fits.open(infile, memmap=True)
                 filenames[p, 0, t] = infile
-                print data[p, n_rows*i:n_rows*(i+1), :, 0, t].shape
-                print hdus[0].data[fits_slice].shape
-                print pb_mask.shape
                 data[p, n_rows*i:n_rows*(i+1), :, 0, t] = np.where(pb_mask[n_rows*i:n_rows*(i+1), :, 0, 0],
                                                                    hdus[0].data[fits_slice],
                                                                    np.nan)*pb_nan[n_rows*i:n_rows*(i+1), :, 0, 0]
@@ -182,5 +181,7 @@ for band in opts.bands:
                         timestep_stop[t] = t+1
                 else:
                     assert timestamp[t] == hdus[0].header['DATE-OBS'], "Timesteps do not match %s in %s" % (opts.suffixes[0], infile)
+        logging.info(" writing to hdf5 file")
         hdf5_data = group.create_dataset(suffix, data_shape, chunks=chunks, dtype=DTYPE, compression='lzf', shuffle=True)
-        hdf5_data = data
+        hdf5_data[...] = data
+        logging.info(" done with %s" % suffix)
