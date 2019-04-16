@@ -32,7 +32,7 @@ class ImageStack(object):
     def __init__(self, h5filename, image_type='image', freq=None, steps=None, mode='r'):
         self.df = h5py.File(h5filename, mode)
         assert image_type in ('image', 'dirty', 'model', 'moment'), "Unsupported image_type %s." % image_type
-        assert self.df.attrs['VERSION'] == '0.1', "Wrong version. Expected 0.1, got %s" % self.df.attrs['VERSION']
+        #assert self.df.attrs['VERSION'] == '0.1', "Wrong version. Expected 0.1, got %s" % self.df.attrs['VERSION']
         self.image_type = image_type
         if freq is None:
             self.group = self.df['/']

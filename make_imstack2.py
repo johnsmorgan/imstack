@@ -31,7 +31,6 @@ parser = OptionParser(usage="usage: obsid" +
                       """)
 parser.add_option("-n", default=N_TIMESTEPS, dest="n", type="int", help="number of timesteps to process [default: %default]")
 parser.add_option("--start", default=TIME_INDEX, dest="start", type="int", help="starting time index [default: %default]")
-parser.add_option("--n_pass", default=N_PASS, dest="n_pass", type="int", help="number of passes [default: %default]")
 parser.add_option("--step", default=TIME_INTERVAL, dest="step", type="float", help="time between timesteps [default: %default]")
 parser.add_option("--outfile", default=None, dest="outfile", type="str", help="outfile [default: [obsid].hdf5]")
 parser.add_option("--suffixes", default=SUFFIXES, dest="suffixes", type="str", help="comma-separated list of suffixes to store [default: %default]")
@@ -149,39 +148,39 @@ for band in opts.bands:
         header.attrs[key] = item
 
     for s, suffix in enumerate(opts.suffixes):
-        data = group.create_dataset(suffix, data_shape, chunks=chunks, dtype=DTYPE, compression='lzf', shuffle=True)
+        logging.info("processing segment %s" % (suffix))
+        data = np.empty(data_shape, dtype=DTYPE)
         filenames = group.create_dataset("%s_filenames" % suffix, (len(opts.pols), N_CHANNELS, opts.n), dtype="S%d" % len(header_file), compression='lzf')
 
-        n_rows = image_size/opts.n_pass
-        for i in range(opts.n_pass):
-            logging.info("processing segment %d/%d" % (i+1, opts.n_pass))
-            for t in xrange(opts.n):
-                im_slice = [slice(n_rows*i, n_rows*(i+1)), slice(None, None, None)]
-                fits_slice = SLICE[:-2] + im_slice
+        for t in xrange(opts.n):
+            im_slice = [slice(n_rows*i, n_rows*(i+1)), slice(None, None, None)]
+            fits_slice = SLICE[:-2] + im_slice
 
-                for p, pol in enumerate(opts.pols):
+            for p, pol in enumerate(opts.pols):
 
-                    if band is None:
-                        infile = FILENAME.format(obsid=obsid, time=t+opts.start, pol=pol, suffix=suffix)
+                if band is None:
+                    infile = FILENAME.format(obsid=obsid, time=t+opts.start, pol=pol, suffix=suffix)
+                else:
+                    infile = FILENAME_BAND.format(obsid=obsid, band=band, time=t+opts.start, pol=pol, suffix=suffix)
+                logging.info(" processing %s", infile)
+                hdus = fits.open(infile, memmap=True)
+                filenames[p, 0, t] = infile
+                print data[p, n_rows*i:n_rows*(i+1), :, 0, t].shape
+                print hdus[0].data[fits_slice].shape
+                print pb_mask.shape
+                data[p, n_rows*i:n_rows*(i+1), :, 0, t] = np.where(pb_mask[n_rows*i:n_rows*(i+1), :, 0, 0],
+                                                                   hdus[0].data[fits_slice],
+                                                                   np.nan)*pb_nan[n_rows*i:n_rows*(i+1), :, 0, 0]
+
+                if s == 0 and p == 0:
+                    timestamp[t] = hdus[0].header['DATE-OBS']
+                    if opts.old_wcs_timesteps:
+                        timestep_start[t] = hdus[0].header['WSCTIMES']
+                        timestep_stop[t] = hdus[0].header['WSCTIMEE']
                     else:
-                        infile = FILENAME_BAND.format(obsid=obsid, band=band, time=t+opts.start, pol=pol, suffix=suffix)
-                    logging.info(" processing %s", infile)
-                    hdus = fits.open(infile, memmap=True)
-                    filenames[p, 0, t] = infile
-                    print data[p, n_rows*i:n_rows*(i+1), :, 0, t].shape
-                    print hdus[0].data[fits_slice].shape
-                    print pb_mask.shape
-                    data[p, n_rows*i:n_rows*(i+1), :, 0, t] = np.where(pb_mask[n_rows*i:n_rows*(i+1), :, 0, 0],
-                                                                       hdus[0].data[fits_slice],
-                                                                       np.nan)*pb_nan[n_rows*i:n_rows*(i+1), :, 0, 0]
-
-                    if s == 0 and p == 0:
-                        timestamp[t] = hdus[0].header['DATE-OBS']
-                        if opts.old_wcs_timesteps:
-                            timestep_start[t] = hdus[0].header['WSCTIMES']
-                            timestep_stop[t] = hdus[0].header['WSCTIMEE']
-                        else:
-                            timestep_start[t] = t
-                            timestep_stop[t] = t+1
-                    else:
-                        assert timestamp[t] == hdus[0].header['DATE-OBS'], "Timesteps do not match %s in %s" % (opts.suffixes[0], infile)
+                        timestep_start[t] = t
+                        timestep_stop[t] = t+1
+                else:
+                    assert timestamp[t] == hdus[0].header['DATE-OBS'], "Timesteps do not match %s in %s" % (opts.suffixes[0], infile)
+        hdf5_data = group.create_dataset(suffix, data_shape, chunks=chunks, dtype=DTYPE, compression='lzf', shuffle=True)
+        hdf5_data = data
