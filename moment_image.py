@@ -148,7 +148,7 @@ else:
     # this should minimise disk reads by reading adjacent parts of the file at approximately the same time
     # i.e. processes 1-N will read chunks 1-N at about the same time
     if opts.remove_zeros:
-        zero_filter = np.argwhere(imstack.pix2ts[data_x//2, data_y//2] == 0.0))
+        zero_filter = np.argwhere(imstack.pix2ts[data_x//2, data_y//2] == 0.0)
         print "Worker rank {} found {} zero timesteps: ".format(rank, len(zero_filter)) + str(zero_filter)
     for index in indexes:
         slice_x, slice_y = index_to_chunk(index, chunk_x, data_x, chunk_y, data_y)
