@@ -49,9 +49,9 @@ if len(args) != 1:
 obsid = int(args[0])
 
 if opts.verbose == 1:
-    logging.basicConfig(format='%(asctime)s-%(levelname): %(message)s', level=logging.INFO)
+    logging.basicConfig(format='%(asctime)s-%(levelname)s %(message)s', level=logging.INFO)
 elif opts.verbose > 1:
-    logging.basicConfig(format='%(asctime)s-%(levelname): %(message)s', level=logging.DEBUG)
+    logging.basicConfig(format='%(asctime)s-%(levelname)s %(message)s', level=logging.DEBUG)
 
 if opts.outfile is None:
     opts.outfile = "%d.hdf5" % obsid
