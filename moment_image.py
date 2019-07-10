@@ -36,7 +36,7 @@ parser.add_option("-f", "--freq", default=None, dest="freq", help="freq")
 parser.add_option("--filter_hi", action="store_true", dest="filter_hi", help="apply high-end (low-pass) filter")
 parser.add_option("--filter_lo", action="store_true", dest="filter_lo", help="apply low-end (high-pass) filter")
 parser.add_option("--pbcor", action="store_true", dest="pbcor", help="apply primary beam correction")
-parser.add_option("--suffix", default='', dest="suffix", type="string", help="")
+parser.add_option("--suffix", default='image', dest="suffix", type="string", help="")
 parser.add_option("--start", default=8, dest="start", type="int", help="start timestep")
 parser.add_option("--stop", default=584, dest="stop", type="int", help="stop timestep")
 parser.add_option("--remove_zeros", action="store_true", dest="remove_zeros", help="unless overridden with this flag, central pixel is checked for exact zeros and these timesteps are excised.")
@@ -71,7 +71,7 @@ def index_to_chunk(index, chunk_x, data_x, chunk_y, data_y):
     y_index = index//(data_x//chunk_x)
     return slice(x_index*chunk_x, (x_index+1)*chunk_x), slice(y_index*chunk_y, (y_index+1)*chunk_y)
 
-imstack = ImageStack(hdf5_in, freq=opts.freq, steps=timesteps)
+imstack = ImageStack(hdf5_in, freq=opts.freq, steps=timesteps, image_type=opts.suffix)
 if os.path.exists(HDF5_OUT % (basename, opts.suffix)):
     with h5py.File(HDF5_OUT % (basename, opts.suffix)) as df:
         assert not group in df.keys(), "output hdf5 file already contains this %s" % opts.freq
