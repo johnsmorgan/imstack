@@ -108,12 +108,13 @@ class ImageStack(object):
             return self.group['beam'].attrs['SCALE']
         return 1.0
 
-    def pix2beam(self, x, y, avg_pol=True):
+    def pix2beam(self, x, y, avg_pol=True, scale=True):
         """
         get beam corresponding to x,y
         """
         beam = self.group['beam'][:, y, x, self.channel, 0]
-        beam *= self.get_scale()
+        if scale == True:
+            beam *= self.get_scale()
         if avg_pol is True:
             if not np.any(beam):
                 return 0.0
@@ -121,12 +122,12 @@ class ImageStack(object):
         else:
             return beam
 
-    def world2beam(self, ra, dec, avg_pol=True):
+    def world2beam(self, ra, dec, avg_pol=True, scale=True):
         """
         get beam corresponding to ra,dec
         """
         x, y = self.world2pix(ra, dec)
-        return self.pix2beam(x, y, avg_pol)
+        return self.pix2beam(x, y, avg_pol, scale=True)
 
     def pix2ts(self, x, y, avg_pol=True, correct=True):
         """
