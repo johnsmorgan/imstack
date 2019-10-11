@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os, sys, datetime, logging, h5py, contextlib
+import os, sys, psutil, datetime, logging, h5py, contextlib
 import numpy as np
 from optparse import OptionParser #NB zeus does not have argparse!
 from astropy.io import fits
@@ -186,7 +186,12 @@ for band in opts.bands:
 
     for s, suffix in enumerate(opts.suffixes):
         logging.info("processing segment %s" % (suffix))
-        data = np.zeros(data_shape, dtype=DTYPE)
+        logging.info("about to allocate data %s", psutil.virtual_memory())
+
+        if s == 0:
+            data = np.zeros(data_shape, dtype=DTYPE)
+        else:
+            data *= 0
         filenames = group.create_dataset("%s_filenames" % suffix, (len(opts.pols), N_CHANNELS, opts.n), dtype="S%d" % len(header_file), compression='lzf')
 
         n_rows = image_size
