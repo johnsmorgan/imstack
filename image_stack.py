@@ -114,7 +114,12 @@ class ImageStack(object):
         """
         beam = self.group['beam'][:, y, x, self.channel, 0]
         if scale == True:
-            beam *= self.get_scale()
+            if len(beam.shape) == 1:
+                beam *= self.get_scale()[:, 0, 0, self.channel, 0]
+            elif len(beam.shape) == 3:
+                beam *= self.get_scale()[:, :, :, self.channel, 0]
+            else:
+                raise RuntimeError, "don't know how to deal with beam shape %s" % (beam.shape)
         if avg_pol is True:
             if not np.any(beam):
                 return 0.0
@@ -127,7 +132,7 @@ class ImageStack(object):
         get beam corresponding to ra,dec
         """
         x, y = self.world2pix(ra, dec)
-        return self.pix2beam(x, y, avg_pol, scale=True)
+        return self.pix2beam(x, y, avg_pol, scale=scale)
 
     def pix2ts(self, x, y, avg_pol=True, correct=True):
         """
