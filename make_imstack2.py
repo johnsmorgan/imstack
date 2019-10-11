@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os, datetime, logging, h5py, contextlib
+import os, sys, datetime, logging, h5py, contextlib
 import numpy as np
 from optparse import OptionParser #NB zeus does not have argparse!
 from astropy.io import fits
@@ -38,6 +38,9 @@ parser.add_option("--bands", default=None, dest="bands", type="str", help="comma
 parser.add_option("--pols", default=POLS, dest="pols", type="str", help="comma-separated list of pols [default: %default]")
 parser.add_option("--pb_thresh", default=PB_THRESHOLD, dest="pb_thresh", type="float", help="flag below this threshold [default: %default]")
 parser.add_option("--stamp_size", default=STAMP_SIZE, dest="stamp_size", type="int", help="hdf5 stamp size [default: %default]")
+parser.add_option("--skip_beam", action="store_true", dest="skip_beam", help="don't include beam")
+parser.add_option("--check_filenames_only", action="store_true", dest="check_filenames_only", help="check all required files are present then quit.")
+parser.add_option("--allow_missing", action="store_true", dest="allow_missing", help="check for presence of files for contiguous timesteps from --start up to -n")
 parser.add_option("--old_wsc_timesteps", action="store_true", dest="old_wcs_timesteps", help="use old WSClean timesteps to check files")
 parser.add_option("-v", "--verbose", action="count", dest="verbose", help="-v info, -vv debug")
 
@@ -69,9 +72,13 @@ if opts.bands is None:
 else:
     opts.bands = opts.bands.split(',')
 
+if opts.skip_beam:
+    logging.warn("Warning: not including primary beam! pb_thresh will be ignored")
+
 if opts.old_wcs_timesteps:
     logging.warn("Warning: using old WSC timesteps. Not recommended, even for old WSClean images!")
 
+# check that all image files are present
 for band in opts.bands:
     for suffix in opts.suffixes:
         for t in xrange(opts.start, opts.n+opts.start):
@@ -81,8 +88,33 @@ for band in opts.bands:
                 else:
                     infile = FILENAME_BAND.format(obsid=obsid, band=band, time=t, pol=p, suffix=suffix)
                 if not os.path.exists(infile):
+                    if opts.allow_missing:
+                        new_n = t-opts.start
+                        logging.info("couldn't find file %s: reducing n from %d to %d", infile, opts.n, new_n)
+                        opts.n = new_n
+                        break
                     raise IOError, "couldn't find file %s" % infile
                 logging.debug("%s found", infile)
+            else:
+                #no break out of pol loop, continue
+                continue
+            # else not triggered, so break encountered -- break out of timestep loop also
+            break
+
+if not opts.skip_beam:
+    # check that all required primary beam files files are present
+    for band in opts.bands:
+        for p in opts.pols:
+            if band is None:
+                pbfile = PB_FILE.format(obsid=obsid, pol=pol)
+            else:
+                pbfile = PB_FILE_BAND.format(obsid=obsid, band=band, pol=pol)
+            if not os.path.exists(pbfile):
+                raise IOError, "couldn't find file %s" % pbfile
+            logging.debug("%s found", pbfile)
+
+if opts.check_filenames_only:
+    sys.exit()
 
 propfaid = h5py.h5p.create(h5py.h5p.FILE_ACCESS)
 settings = list(propfaid.get_cache())
@@ -115,23 +147,28 @@ for band in opts.bands:
     image_size = hdus[HDU].data.shape[-1]
     assert image_size % opts.stamp_size == 0, "image_size must be divisible by stamp_size"
     data_shape = [len(opts.pols), image_size, image_size, N_CHANNELS, opts.n]
+    logging.debug("data shape: %s" % data_shape)
     chunks = (len(opts.pols), opts.stamp_size, opts.stamp_size, N_CHANNELS, opts.n)
 
-    beam_shape = data_shape[:-1] + [1] # just one beam for all timesteps for now
-    beam = group.create_dataset("beam", beam_shape, dtype=np.float32, compression='lzf', shuffle=True)
-    for p, pol in enumerate(opts.pols):
-        if band is None:
-            hdus = fits.open(PB_FILE.format(obsid=obsid, pol=pol), memmap=True)
-        else:
-            hdus = fits.open(PB_FILE_BAND.format(obsid=obsid, band=band, pol=pol), memmap=True)
-        beam[p, :, :, 0, 0] = hdus[HDU].data[SLICE]
-        for key, item in hdus[0].header.iteritems():
-            beam.attrs[key] = item
-    pb_sum = np.sqrt(np.sum(beam[...]**2, axis=0)/len(opts.pols))
-    pb_mask = pb_sum > opts.pb_thresh*np.nanmax(pb_sum)
-    pb_nan = pb_sum/pb_sum
-    if np.any(np.isnan(pb_sum)):
-        logging.warn("NaNs in primary beam")
+    if not opts.skip_beam:
+        beam_shape = data_shape[:-1] + [1] # just one beam for all timesteps for now
+        beam = group.create_dataset("beam", beam_shape, dtype=np.float32, compression='lzf', shuffle=True)
+        for p, pol in enumerate(opts.pols):
+            if band is None:
+                hdus = fits.open(PB_FILE.format(obsid=obsid, pol=pol), memmap=True)
+            else:
+                hdus = fits.open(PB_FILE_BAND.format(obsid=obsid, band=band, pol=pol), memmap=True)
+            beam[p, :, :, 0, 0] = hdus[HDU].data[SLICE]
+            for key, item in hdus[0].header.iteritems():
+                beam.attrs[key] = item
+        pb_sum = np.sqrt(np.sum(beam[...]**2, axis=0)/len(opts.pols))
+        pb_mask = pb_sum > opts.pb_thresh*np.nanmax(pb_sum)
+        pb_nan = pb_sum/pb_sum
+        if np.any(np.isnan(pb_sum)):
+            logging.warn("NaNs in primary beam")
+    else:
+        pb_mask = np.ones(data_shape[1:-1] + [1], dtype=np.bool)
+        pb_nan = np.ones(data_shape[1:-1] + [1])
 
     # write main header information
     timestep_start = group.create_dataset("timestep_start", (opts.n,), dtype=np.uint16)
@@ -149,7 +186,7 @@ for band in opts.bands:
 
     for s, suffix in enumerate(opts.suffixes):
         logging.info("processing segment %s" % (suffix))
-        data = np.empty(data_shape, dtype=DTYPE)
+        data = np.zeros(data_shape, dtype=DTYPE)
         filenames = group.create_dataset("%s_filenames" % suffix, (len(opts.pols), N_CHANNELS, opts.n), dtype="S%d" % len(header_file), compression='lzf')
 
         n_rows = image_size
