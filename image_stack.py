@@ -115,9 +115,9 @@ class ImageStack(object):
         beam = self.group['beam'][:, y, x, self.channel, 0]
         if scale == True:
             if len(beam.shape) == 1:
-                beam *= self.get_scale()[:, 0, 0, self.channel, 0]
+                beam *= self.get_scale()
             elif len(beam.shape) == 3:
-                beam *= self.get_scale()[:, :, :, self.channel, 0]
+                beam *= self.get_scale()
             else:
                 raise RuntimeError, "don't know how to deal with beam shape %s" % (beam.shape)
         if avg_pol is True:
