@@ -43,7 +43,7 @@ if __name__ == '__main__':
         cont_shape = data_shape[:-1] + [1] # by definition just one continuum image for all timesteps
         print cont_shape
         if "continuum" in group.keys():
-            assert group['continuum'].shape == tuple(cont_shape), "Error, continuum already exists and is the wrong shape %s %s" % (group['continuum'].shape, continuum_shape)
+            assert group['continuum'].shape == tuple(cont_shape), "Error, continuum already exists and is the wrong shape %s %s" % (group['continuum'].shape, cont_shape)
             if opts.overwrite:
                 logging.warn("Overwriting existing continuum image")
             else:
@@ -53,11 +53,11 @@ if __name__ == '__main__':
             cont = group.create_dataset("continuum", cont_shape, dtype=np.float32, compression='lzf', shuffle=True)
 
         hdus_x = fits.open("%s_%s-XX-%s.fits" % (prefix, chan_str, suffix))
-        hdus_y = fits.open("%s_%s-XX-%s.fits" % (prefix, chan_str, suffix))
+        hdus_y = fits.open("%s_%s-YY-%s.fits" % (prefix, chan_str, suffix))
 
         logging.debug("writing header")
         for key, item in hdus_x[0].header.iteritems():
-            if key=='CRVAL4':
+            if key == 'CRVAL4':
                 continue
             if not key in ('COMMENT', 'HISTORY'):
                 if not hdus_y[0].header[key] == item:
