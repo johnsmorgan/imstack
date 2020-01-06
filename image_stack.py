@@ -218,6 +218,23 @@ class ImageStack(object):
             #cube has axes pol, x, y, time
             return semihex(cube.reshape(cube.shape[0], cube.shape[1]*cube.shape[2], cube.shape[3]), axis=1)
 
+    def get_continuum(self, avg_pol=True, correct=True):
+        """
+        Generate continuum image.
+        """
+
+        self.header = self.group['header'].attrs
+        cont = self.group['continuum'][:, :, :, self.channel, 0]
+        beam = self.group['beam'][:, :, :, self.channel, 0]
+        if avg_pol is True:
+            cont = np.average(cont/beam, axis=0, weights=beam**2)
+            if correct is True:
+                return cont
+            return cont*np.hypot(beam[0], beam[1])
+        else:
+            if correct is True:
+                return cont/beam[:, np.newaxis]
+            return cont
 
 if __name__ == "__main__":
     """
