@@ -13,9 +13,9 @@ N_POL = 2
 POLS = ("XX", "YY")
 
 if __name__ == '__main__':
-    parser = OptionParser(usage="usage: get_continuum.py hdf5 chanstring outfile" +
+    parser = OptionParser(usage="usage: get_continuum.py image_stack.hdf5 chanstring outfile" +
                           """
-                           read continuum from hdf5 into (fits) outfile
+                          calculate (Stokes-I) image from image stack and write to fits file.
                           """)
     parser.add_option("-v", "--verbose", action="count", dest="verbose", help="-v info, -vv debug")
     parser.add_option("--overwrite", action="store_true", dest="overwrite", help="overwrite outfile if it exists")
