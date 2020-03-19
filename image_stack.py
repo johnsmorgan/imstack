@@ -28,6 +28,27 @@ def semihex(data, axis=None):
     h1, h5 = np.percentile(data, (100/6., 500/6.), axis=axis)
     return (h5-h1)/2.
 
+def hypotn(d, axis=0):
+    """
+    similar to hypot but not restricted to 2
+    """
+    return np.sqrt(np.sum(d**2, axis=axis))
+
+def sault_weight(data, beam, correct=False):
+    """
+    For combining data from multiple pointings / polarisations
+
+    Essentially 1996A&AS..120..375S Equation 1, but simplified to assume equal noise for both polarisations.
+    Pointing / Polarisation must be first axis for both data and beam
+    """
+    while len(data.shape) > len(beam.shape):
+        beam = beam[..., np.newaxis]
+
+    data_weighted = np.average(data/beam, axis=0, weights=beam**2)
+    if correct is True:
+        return data_weighted
+    return data_weighted*hypotn(beam)/np.sqrt(len(beam))
+
 class ImageStack(object):
     def __init__(self, h5filename, image_type='image', freq=None, steps=None, mode='r'):
         self.df = h5py.File(h5filename, mode)
@@ -108,18 +129,21 @@ class ImageStack(object):
             return self.group['beam'].attrs['SCALE']
         return 1.0
 
+    def scale_beam(self, beam):
+            if len(beam.shape) == 1:
+                return beam * self.get_scale()
+            elif len(beam.shape) == 3:
+                return beam * self.get_scale()
+            else:
+                raise RuntimeError("don't know how to deal with beam shape %s" % (beam.shape))
+
     def pix2beam(self, x, y, avg_pol=True, scale=True):
         """
         get beam corresponding to x,y
         """
         beam = self.group['beam'][:, y, x, self.channel, 0]
         if scale == True:
-            if len(beam.shape) == 1:
-                beam *= self.get_scale()
-            elif len(beam.shape) == 3:
-                beam *= self.get_scale()
-            else:
-                raise RuntimeError, "don't know how to deal with beam shape %s" % (beam.shape)
+            beam = self.scale_beam(beam)
         if avg_pol is True:
             if not np.any(beam):
                 return 0.0
@@ -146,9 +170,7 @@ class ImageStack(object):
         if avg_pol is True:
             beam = self.pix2beam(x, y, False)
             ts = np.average(ts/beam[:, np.newaxis], axis=0, weights=beam**2)
-            if correct is True:
-                return ts
-            return ts*hypot(beam[0], beam[1])
+            return sault_weight(data, beam, correct)
         else:
             if correct is True:
                 beam = self.pix2beam(x, y, False)
@@ -227,10 +249,7 @@ class ImageStack(object):
         cont = self.group['continuum'][:, :, :, self.channel, 0]
         beam = self.group['beam'][:, :, :, self.channel, 0]
         if avg_pol is True:
-            cont = np.average(cont/beam, axis=0, weights=beam**2)
-            if correct is True:
-                return cont
-            return cont*np.hypot(beam[0], beam[1])
+            return sault_weight(data, beam, correct)
         else:
             if correct is True:
                 return cont/beam[:, np.newaxis]
