@@ -3,9 +3,10 @@ import setuptools
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
-reqs = ['numpy>=1.10',
-        'scipy>=0.16',
-        'astropy>=2.0']
+reqs = ['h5py>=2.10',
+        'numpy>=1.18',
+        'scipy>=1.4',
+        'astropy>=4.0']
 setuptools.setup(
     name="imstack", # Replace with your own username
     version="0.2.0",
@@ -15,7 +16,7 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/johnsmorgan/imstack",
-    scripts=['imstack/add_continuum.py', 'imstack/make_imstack2.py', 'imstack/moment_image.py', 'imstack/get_continuum.py', 'imstack/make_imstack.py'],
+    scripts=['imstack/add_continuum.py', 'imstack/moment_image.py', 'imstack/get_continuum.py', 'imstack/make_imstack.py'],
     packages=['imstack'],
     install_requires=reqs,
     classifiers=[
