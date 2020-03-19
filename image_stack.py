@@ -169,8 +169,7 @@ class ImageStack(object):
         ts = self.data[:, y, x, self.channel, self.steps[0]:self.steps[1]].astype(np.float_)
         if avg_pol is True:
             beam = self.pix2beam(x, y, False)
-            ts = np.average(ts/beam[:, np.newaxis], axis=0, weights=beam**2)
-            return sault_weight(data, beam, correct)
+            return sault_weight(ts, beam, correct)
         else:
             if correct is True:
                 beam = self.pix2beam(x, y, False)
@@ -249,7 +248,7 @@ class ImageStack(object):
         cont = self.group['continuum'][:, :, :, self.channel, 0]
         beam = self.group['beam'][:, :, :, self.channel, 0]
         if avg_pol is True:
-            return sault_weight(data, beam, correct)
+            return sault_weight(cont, beam, correct)
         else:
             if correct is True:
                 return cont/beam[:, np.newaxis]
