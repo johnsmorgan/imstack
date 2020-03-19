@@ -16,7 +16,7 @@ if __name__ == '__main__':
                           """
                            read [prefix]_chanstring-XX-suffix.fits and [prefix]_chanstring-YY-suffix.fits into hdf5
                           """)
-    parser.add_option("-v", "--verbose", action="count", dest="verbose", help="-v info, -vv debug")
+    parser.add_option("-v", "--verbose", action="count", default=0, dest="verbose", help="-v info, -vv debug")
     parser.add_option("--overwrite", action="store_true", dest="overwrite", help="delete continuum images if they already exist")
 
     opts, args = parser.parse_args()

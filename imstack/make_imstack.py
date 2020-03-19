@@ -42,7 +42,7 @@ parser.add_option("--skip_beam", action="store_true", dest="skip_beam", help="do
 parser.add_option("--check_filenames_only", action="store_true", dest="check_filenames_only", help="check all required files are present then quit.")
 parser.add_option("--allow_missing", action="store_true", dest="allow_missing", help="check for presence of files for contiguous timesteps from --start up to -n")
 parser.add_option("--old_wsc_timesteps", action="store_true", dest="old_wcs_timesteps", help="use old WSClean timesteps to check files")
-parser.add_option("-v", "--verbose", action="count", dest="verbose", help="-v info, -vv debug")
+parser.add_option("-v", "--verbose", action="count", dest="verbose", default=0, help="-v info, -vv debug")
 
 opts, args = parser.parse_args()
 
