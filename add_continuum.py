@@ -39,15 +39,15 @@ if __name__ == '__main__':
     with File(imstack_path, 'a') as imstack:
         group = imstack[chan_str]
         data_shape = list(group['image'].shape)
-        print data_shape
+        logging.debug("data shape %s", data_shape)
         cont_shape = data_shape[:-1] + [1] # by definition just one continuum image for all timesteps
-        print cont_shape
+        logging.debug("continuum shape %s", cont_shape)
         if "continuum" in group.keys():
             assert group['continuum'].shape == tuple(cont_shape), "Error, continuum already exists and is the wrong shape %s %s" % (group['continuum'].shape, cont_shape)
             if opts.overwrite:
                 logging.warn("Overwriting existing continuum image")
             else:
-                raise RuntimeError, "Continuum image already exists. User --overwrite to overwrite"
+                raise RuntimeError("Continuum image already exists. User --overwrite to overwrite")
             cont = group['continuum']
         else:
             cont = group.create_dataset("continuum", cont_shape, dtype=np.float32, compression='lzf', shuffle=True)
@@ -56,7 +56,7 @@ if __name__ == '__main__':
         hdus_y = fits.open("%s_%s-YY-%s.fits" % (prefix, chan_str, suffix))
 
         logging.debug("writing header")
-        for key, item in hdus_x[0].header.iteritems():
+        for key, item in hdus_x[0].header.items():
             if key == 'CRVAL4':
                 continue
             if not key in ('COMMENT', 'HISTORY'):

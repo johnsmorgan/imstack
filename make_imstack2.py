@@ -81,7 +81,7 @@ if opts.old_wcs_timesteps:
 # check that all image files are present
 for band in opts.bands:
     for suffix in opts.suffixes:
-        for t in xrange(opts.start, opts.n+opts.start):
+        for t in range(opts.start, opts.n+opts.start):
             for p in opts.pols:
                 if band is None:
                     infile = FILENAME.format(obsid=obsid, time=t, pol=p, suffix=suffix)
@@ -93,7 +93,7 @@ for band in opts.bands:
                         logging.info("couldn't find file %s: reducing n from %d to %d", infile, opts.n, new_n)
                         opts.n = new_n
                         break
-                    raise IOError, "couldn't find file %s" % infile
+                    raise IOError("couldn't find file %s" % infile)
                 logging.debug("%s found", infile)
             else:
                 #no break out of pol loop, continue
@@ -110,7 +110,7 @@ if not opts.skip_beam:
             else:
                 pbfile = PB_FILE_BAND.format(obsid=obsid, band=band, pol=pol)
             if not os.path.exists(pbfile):
-                raise IOError, "couldn't find file %s" % pbfile
+                raise IOError("couldn't find file %s" % pbfile)
             logging.debug("%s found", pbfile)
 
 if opts.check_filenames_only:
@@ -159,7 +159,7 @@ for band in opts.bands:
             else:
                 hdus = fits.open(PB_FILE_BAND.format(obsid=obsid, band=band, pol=pol), memmap=True)
             beam[p, :, :, 0, 0] = hdus[HDU].data[SLICE]
-            for key, item in hdus[0].header.iteritems():
+            for key, item in hdus[0].header.items():
                 beam.attrs[key] = item
         pb_sum = np.sqrt(np.sum(beam[...]**2, axis=0)/len(opts.pols))
         pb_mask = pb_sum > opts.pb_thresh*np.nanmax(pb_sum)
@@ -181,7 +181,7 @@ for band in opts.bands:
     # add fits header to attributes
     hdus = fits.open(header_file, memmap=True)
     header = group.create_dataset('header', data=[], dtype=DTYPE)
-    for key, item in hdus[0].header.iteritems():
+    for key, item in hdus[0].header.items():
         header.attrs[key] = item
 
     for s, suffix in enumerate(opts.suffixes):
@@ -196,7 +196,7 @@ for band in opts.bands:
 
         n_rows = image_size
         i=0
-        for t in xrange(opts.n):
+        for t in range(opts.n):
             im_slice = [slice(n_rows*i, n_rows*(i+1)), slice(None, None, None)]
             fits_slice = SLICE[:-2] + im_slice
 

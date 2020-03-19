@@ -120,7 +120,7 @@ with File(opts.outfile, file_mode, 0.9*CACHE_SIZE*1024**3, 1) as df:
             else:
                 hdus = fits.open(PB_FILE_BAND.format(obsid=obsid, band=band, pol=pol), memmap=True)
             beam[p, :, :, 0, 0] = hdus[HDU].data[SLICE]
-            for key, item in hdus[0].header.iteritems():
+            for key, item in hdus[0].header.items():
                 beam.attrs[key] = item
         pb_sum = np.sqrt(np.sum(beam[...]**2, axis=0)/len(opts.pols))
         pb_mask = pb_sum > opts.pb_thresh*np.nanmax(pb_sum)
@@ -138,7 +138,7 @@ with File(opts.outfile, file_mode, 0.9*CACHE_SIZE*1024**3, 1) as df:
         # add fits header to attributes
         hdus = fits.open(header_file, memmap=True)
         header = group.create_dataset('header', data=[], dtype=DTYPE)
-        for key, item in hdus[0].header.iteritems():
+        for key, item in hdus[0].header.items():
             header.attrs[key] = item
 
         for s, suffix in enumerate(opts.suffixes):
@@ -149,7 +149,7 @@ with File(opts.outfile, file_mode, 0.9*CACHE_SIZE*1024**3, 1) as df:
             n_rows = image_size/opts.n_pass
             for i in range(opts.n_pass):
                 logging.info("processing segment %d/%d" % (i+1, opts.n_pass))
-                for t in xrange(opts.n):
+                for t in range(opts.n):
                     im_slice = [slice(n_rows*i, n_rows*(i+1)), slice(None, None, None)]
                     fits_slice = SLICE[:-2] + im_slice
 
@@ -162,9 +162,9 @@ with File(opts.outfile, file_mode, 0.9*CACHE_SIZE*1024**3, 1) as df:
                         logging.info(" processing %s", infile)
                         hdus = fits.open(infile, memmap=True)
                         filenames[p, 0, t] = infile
-                        print data[p, n_rows*i:n_rows*(i+1), :, 0, t].shape
-                        print hdus[0].data[fits_slice].shape
-                        print pb_mask.shape
+                        #print data[p, n_rows*i:n_rows*(i+1), :, 0, t].shape
+                        #print hdus[0].data[fits_slice].shape
+                        #print pb_mask.shape
                         data[p, n_rows*i:n_rows*(i+1), :, 0, t] = np.where(pb_mask[n_rows*i:n_rows*(i+1), :, 0, 0],
                                                                            hdus[0].data[fits_slice],
                                                                            np.nan)*pb_nan[n_rows*i:n_rows*(i+1), :, 0, 0]

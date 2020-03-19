@@ -38,7 +38,7 @@ if __name__ == '__main__':
     imstack = ImageStack(imstack_path, freq=chan_str)
     cont = imstack.get_continuum(True, opts.corrected)
     hdu = fits.PrimaryHDU(cont[np.newaxis, np.newaxis, ...])
-    for key, item in imstack.group['continuum'].attrs.iteritems(): 
+    for key, item in imstack.group['continuum'].attrs.items(): 
         hdu.header[key] = item
         if key=='CRPIX4':
             hdu.header['CRVAL4'] = 1

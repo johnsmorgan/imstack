@@ -90,7 +90,7 @@ tag_pad = len(str(total_chunks)) # for tidy printing
 rank_pad = len(str(size))        # 
 
 if rank == 0:
-    print "Master started on {}. {} Workers to process {} chunks".format(name, size-1, total_chunks)
+    print("Master started on {}. {} Workers to process {} chunks".format(name, size-1, total_chunks))
     completed = [False for i in range(total_chunks)]
     out_data = np.zeros((data_y, data_x, N_MOMENTS), dtype=np.float32)
     while sum(completed) < total_chunks:
@@ -100,10 +100,10 @@ if rank == 0:
         slice_x, slice_y = index_to_chunk(tag, chunk_x, data_x, chunk_y, data_y)
         out_data[slice_y, slice_x] = data
         completed[tag] = True
-        print "chunk {} received from {}, {}/{} completed".format(str(tag).rjust(tag_pad),
+        print("chunk {} received from {}, {}/{} completed".format(str(tag).rjust(tag_pad),
                                                                   str(source).rjust(rank_pad),
                                                                   str(sum(completed)).rjust(tag_pad),
-                                                                  total_chunks)
+                                                                  total_chunks))
     # write out moments in hdf5 file
     with h5py.File(HDF5_OUT % (basename, opts.suffix)) as df:
         df.attrs['VERSION'] = VERSION
@@ -128,7 +128,7 @@ if rank == 0:
     # write out fits files
     for i in range(N_MOMENTS):
         hdu = fits.PrimaryHDU(out_data[:, :, i].reshape((1, 1, data_y, data_x)))
-        for k, v in imstack.header.iteritems():
+        for k, v in imstack.header.items():
             hdu.header[k] = v
         hdu.header["MOMENT"] = i
         if opts.filter_lo:
@@ -140,16 +140,16 @@ if rank == 0:
             hdu.header['HIORDER'] = FILTER_HI_ORDER
             hdu.header['HICUTOFF'] = FILTER_HI_CUTOFF
         hdu.writeto(FITS_OUT % (basename, opts.freq if opts.freq is not None else "", opts.suffix, i+1))
-    print "Master done"
+    print("Master done")
 else:
     indexes = range(rank-1, total_chunks, size-1)
-    print "Worker rank {} processing {} chunks".format(rank, len(indexes))
+    print("Worker rank {} processing {} chunks".format(rank, len(indexes)))
     data = np.zeros((chunk_y, chunk_x, N_MOMENTS))
     # this should minimise disk reads by reading adjacent parts of the file at approximately the same time
     # i.e. processes 1-N will read chunks 1-N at about the same time
     if opts.remove_zeros:
         zero_filter = np.argwhere(imstack.pix2ts[data_x//2, data_y//2] == 0.0)
-        print "Worker rank {} found {} zero timesteps: ".format(rank, len(zero_filter)) + str(zero_filter)
+        print("Worker rank {} found {} zero timesteps: ".format(rank, len(zero_filter)) + str(zero_filter))
     for index in indexes:
         slice_x, slice_y = index_to_chunk(index, chunk_x, data_x, chunk_y, data_y)
         #                            NB switched order below
@@ -175,4 +175,4 @@ else:
                 ts_data = filtfilt(bb_hi, ab_hi, ts_data, axis=2)
             data[..., 1] = np.std(ts_data, axis=2)
         comm.send(data, dest=0, tag=index)
-    print "Worker rank {} done".format(rank)
+    print("Worker rank {} done".format(rank))
