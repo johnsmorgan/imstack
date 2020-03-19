@@ -6,7 +6,7 @@ from astropy.io import fits
 from scipy.signal import butter, filtfilt
 from scipy.stats import skew, kurtosis
 import h5py
-from image_stack import ImageStack
+from imstack import ImageStack
 
 HDF5_OUT = "%s%s_moments.hdf5"
 IMAGE_TYPE='image'

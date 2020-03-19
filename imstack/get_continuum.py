@@ -5,7 +5,7 @@ import numpy as np
 from optparse import OptionParser #NB zeus does not have argparse!
 
 from astropy.io import fits
-from image_stack import ImageStack
+from imstack import ImageStack
 
 SLICE = [0, 0, slice(None, None, None), slice(None, None, None)]
 
