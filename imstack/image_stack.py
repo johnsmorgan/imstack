@@ -61,7 +61,7 @@ class ImageStack(object):
             self.group = self.df[freq]
         self.data = self.group[image_type]
         self.header = self.group['header'].attrs
-        self.wcs = wcs.WCS(self.header)
+        self.wcs = wcs.WCS({k: v.decode('ascii') if isinstance(v, bytes) else v for k, v in self.header.items()})
         self.channel = 0
         if steps is None:
             self.steps = [0, self.data.shape[-1]]

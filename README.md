@@ -28,6 +28,7 @@ Please cite [Morgan et al. (2018)](http://adsabs.harvard.edu/abs/2018MNRAS.473.2
 * `h5py`
 * `numpy `
 * `astropy`
-* `h5py_cache` (`make_imstack`)
 * `scipy` (`moment_image`)
-* `mpi4py` (`moment_image`)
+* `mpi4py` (`moment_image` -- tested with 3.0.3)
+
+Note that installation of `mpi4py` is not done automatically via setup.py as it is only required for moment_image.py. Installation of mpi4py via e.g. pip, requires mpicc to be available, *not* just mpirun.
