@@ -84,7 +84,7 @@ chunk_x = imstack.data.chunks[2]
 chunk_y = imstack.data.chunks[1]
 data_x = imstack.data.shape[2]
 data_y = imstack.data.shape[1]
-total_chunks = (data_x/chunk_x)*(data_x/chunk_x)
+total_chunks = (data_x//chunk_x)*(data_x//chunk_x)
 
 tag_pad = len(str(total_chunks)) # for tidy printing
 rank_pad = len(str(size))        # 
