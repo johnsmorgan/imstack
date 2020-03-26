@@ -105,7 +105,7 @@ if rank == 0:
                                                                   str(sum(completed)).rjust(tag_pad),
                                                                   total_chunks))
     # write out moments in hdf5 file
-    with h5py.File(HDF5_OUT % (basename, opts.suffix)) as df:
+    with h5py.File(HDF5_OUT % (basename, opts.suffix), 'w') as df:
         df.attrs['VERSION'] = VERSION
         if opts.freq is not None:
             df.create_group(group)
@@ -129,7 +129,7 @@ if rank == 0:
     for i in range(N_MOMENTS):
         hdu = fits.PrimaryHDU(out_data[:, :, i].reshape((1, 1, data_y, data_x)))
         for k, v in imstack.header.items():
-            hdu.header[k] = v
+            hdu.header[k] = v.decode('ascii') if isinstance(v, bytes) else v
         hdu.header["MOMENT"] = i
         if opts.filter_lo:
             hdu.header['LOFILT'] = FILTER.__name__
