@@ -39,6 +39,7 @@ parser.add_option("--pbcor", action="store_true", dest="pbcor", help="apply prim
 parser.add_option("--suffix", default='image', dest="suffix", type="string", help="")
 parser.add_option("--start", default=0, dest="start", type="int", help="start timestep [default %default]")
 parser.add_option("--stop", default=None, dest="stop", type="int", help="stop timestep [default last]")
+parser.add_option("--trim", default=0, dest="trim", type="int", help="skip this number of pixels on each the edge of the image")
 parser.add_option("--remove_zeros", action="store_true", dest="remove_zeros", help="unless overridden with this flag, central pixel is checked for exact zeros and these timesteps are excised.")
 
 opts, args = parser.parse_args()
@@ -61,15 +62,20 @@ rank = comm.Get_rank()  # rank of this process
 name = MPI.Get_processor_name() # Host Name
 status = MPI.Status()   # get MPI status object
 
-def index_to_chunk(index, chunk_x, data_x, chunk_y, data_y):
+def index_to_chunk(index, chunk_x, data_x, trim_x, chunk_y, data_y, trim_y, indata):
     """
     NB assumes chunk fills all but two dimensions
     assumes data % chunk == 0
     assumes x is the faster axis
+    indata=True: return slices for input array (without trim)
+    indata=False: return slices for output array (with trim)
     """
-    x_index = index%(data_x//chunk_x)
-    y_index = index//(data_x//chunk_x)
-    return slice(x_index*chunk_x, (x_index+1)*chunk_x), slice(y_index*chunk_y, (y_index+1)*chunk_y)
+    index_x = index%(data_x//chunk_x)
+    index_y = index//(data_x//chunk_x)
+    if indata is False:
+        return slice(index_x*chunk_x, (index_x+1)*chunk_x), slice(index_y*chunk_y, (index_y+1)*chunk_y)
+    else:
+        return slice((index_x+trim_x)*chunk_x, (index_x+trim_x+1)*chunk_x), slice((index_y+trim_y)*chunk_y, (index_y+trim_y+1)*chunk_y)
 
 imstack = ImageStack(hdf5_in, freq=opts.freq, steps=steps, image_type=opts.suffix)
 if os.path.exists(HDF5_OUT % (basename, opts.suffix)):
@@ -82,22 +88,28 @@ for i in range(N_MOMENTS):
 
 chunk_x = imstack.data.chunks[2]
 chunk_y = imstack.data.chunks[1]
-data_x = imstack.data.shape[2]
-data_y = imstack.data.shape[1]
-total_chunks = (data_x//chunk_x)*(data_x//chunk_x)
+trim_x, remainder_x = divmod(opts.trim, chunk_x)
+trim_y, remainder_y = divmod(opts.trim, chunk_y)
+data_x = imstack.data.shape[2] - 2*trim_x*chunk_x
+data_y = imstack.data.shape[1] - 2*trim_y*chunk_y
+total_chunks = ((data_x//chunk_x))*((data_y//chunk_y))
 
 tag_pad = len(str(total_chunks)) # for tidy printing
 rank_pad = len(str(size))        # 
 
 if rank == 0:
     print("Master started on {}. {} Workers to process {} chunks".format(name, size-1, total_chunks))
+    if remainder_x != 0:
+        print("trim_x reduced by {} to make a integer number of chunks".format(remainder_x))
+    if remainder_y != 0:
+        print("trim_y reduced by {} to make a integer number of chunks".format(remainder_y))
     completed = [False for i in range(total_chunks)]
     out_data = np.zeros((data_y, data_x, N_MOMENTS), dtype=np.float32)
     while sum(completed) < total_chunks:
         data = comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=status)
         source = status.Get_source()
         tag = status.Get_tag()
-        slice_x, slice_y = index_to_chunk(tag, chunk_x, data_x, chunk_y, data_y)
+        slice_x, slice_y = index_to_chunk(tag, chunk_x, data_x, trim_x, chunk_y, data_y, trim_y, False)
         out_data[slice_y, slice_x] = data
         completed[tag] = True
         print("chunk {} received from {}, {}/{} completed".format(str(tag).rjust(tag_pad),
@@ -130,6 +142,9 @@ if rank == 0:
         hdu = fits.PrimaryHDU(out_data[:, :, i].reshape((1, 1, data_y, data_x)))
         for k, v in imstack.header.items():
             hdu.header[k] = v.decode('ascii') if isinstance(v, bytes) else v
+        if opts.trim != 0:
+            hdu.header['CRPIX1'] -= trim_x*chunk_x
+            hdu.header['CRPIX2'] -= trim_y*chunk_y
         hdu.header["MOMENT"] = i
         if opts.filter_lo:
             hdu.header['LOFILT'] = FILTER.__name__
@@ -151,7 +166,7 @@ else:
         zero_filter = np.argwhere(imstack.pix2ts(data_x//2, data_y//2) == 0.0)
         print("Worker rank {} found {} zero timesteps: ".format(rank, len(zero_filter)) + str(zero_filter))
     for index in indexes:
-        slice_x, slice_y = index_to_chunk(index, chunk_x, data_x, chunk_y, data_y)
+        slice_x, slice_y = index_to_chunk(index, chunk_x, data_x, trim_x, chunk_y, data_y, trim_y, True)
         #                            NB switched order below
         try:
             ts_data = imstack.slice2cube(slice_x, slice_y, correct=opts.pbcor)
