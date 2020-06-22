@@ -37,8 +37,8 @@ parser.add_option("--filter_hi", action="store_true", dest="filter_hi", help="ap
 parser.add_option("--filter_lo", action="store_true", dest="filter_lo", help="apply low-end (high-pass) filter")
 parser.add_option("--pbcor", action="store_true", dest="pbcor", help="apply primary beam correction")
 parser.add_option("--suffix", default='image', dest="suffix", type="string", help="")
-parser.add_option("--start", default=0, dest="start", type="int", help="start timestep")
-parser.add_option("--stop", default=None, dest="stop", type="int", help="stop timestep")
+parser.add_option("--start", default=0, dest="start", type="int", help="start timestep [default %default]")
+parser.add_option("--stop", default=None, dest="stop", type="int", help="stop timestep [default last]")
 parser.add_option("--remove_zeros", action="store_true", dest="remove_zeros", help="unless overridden with this flag, central pixel is checked for exact zeros and these timesteps are excised.")
 
 opts, args = parser.parse_args()
