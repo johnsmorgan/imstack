@@ -7,6 +7,7 @@ from scipy.signal import butter, filtfilt
 from scipy.stats import skew, kurtosis
 import h5py
 from imstack import ImageStack
+from time import sleep
 
 HDF5_OUT = "%s%s_moments.hdf5"
 IMAGE_TYPE='image'
@@ -79,7 +80,7 @@ def index_to_chunk(index, chunk_x, data_x, trim_x, chunk_y, data_y, trim_y, inda
 
 imstack = ImageStack(hdf5_in, freq=opts.freq, steps=steps, image_type=opts.suffix)
 if os.path.exists(HDF5_OUT % (basename, opts.suffix)):
-    with h5py.File(HDF5_OUT % (basename, opts.suffix)) as df:
+    with h5py.File(HDF5_OUT % (basename, opts.suffix), 'r') as df:
         assert not group in df.keys(), "output hdf5 file already contains this %s" % opts.freq
     
 for i in range(N_MOMENTS):
@@ -117,43 +118,49 @@ if rank == 0:
                                                                   str(sum(completed)).rjust(tag_pad),
                                                                   total_chunks))
     # write out moments in hdf5 file
+    if total_chunks == 0:
+        # allow all nodes to perform their check that output files do not exist
+        sleep(1)
     with h5py.File(HDF5_OUT % (basename, opts.suffix), 'w') as df:
         df.attrs['VERSION'] = VERSION
         if opts.freq is not None:
             df.create_group(group)
+        else:
+            group="/"
         moments = df[group].create_dataset("moments", (data_y, data_x, 1, N_MOMENTS), dtype=np.float32, compression='gzip', shuffle=True)
+        #removed track_order=True as it gives an error, this will mean that the header is in alphabetical order
         moments[:, :, 0, :] = out_data
+        for k, v in imstack.header.items():
+            moments.attrs[k] = v
+        if opts.trim != 0:
+            moments.attrs['CRPIX1'] -= trim_x*chunk_x
+            moments.attrs['CRPIX2'] -= trim_y*chunk_y
         if opts.filter_lo:
-            moments.attrs['FILTER_LO_FILTER'] = FILTER.__name__
-            moments.attrs['FILTER_LO_ORDER'] = FILTER_ORDER
-            moments.attrs['FILTER_LO_CUTOFF'] = FILTER_CUTOFF
+            moments.attrs['LOFILT'] = FILTER.__name__
+            moments.attrs['LOORDER'] = FILTER_ORDER
+            moments.attrs['LOCUTOF'] = FILTER_CUTOFF
         if opts.filter_hi:
-            moments.attrs['FILTER_HI_FILTER'] = FILTER_HI.__name__
-            moments.attrs['FILTER_HI_ORDER'] = FILTER_HI_ORDER
-            moments.attrs['FILTER_HI_CUTOFF'] = FILTER_HI_CUTOFF
+            moments.attrs['HIFILT'] = FILTER_HI.__name__
+            moments.attrs['HIORDER'] = FILTER_HI_ORDER
+            moments.attrs['HICUTOF'] = FILTER_HI_CUTOFF
+        moments.attrs['PBCOR'] = True if opts.pbcor else False
+        moments.attrs['TSSTART'] = np.int(imstack.steps[0])
+        moments.attrs['TSSTOP'] = np.int(imstack.steps[1])
+        moments.attrs['TRIM'] = True if opts.trim else False
+        moments.attrs['REMOVE0'] = True if opts.remove_zeros else False
 
         # provide links to time-series file
         df[group]['beam'] = h5py.ExternalLink(hdf5_in, imstack.group['beam'].name)
         df[group][imstack.image_type] = h5py.ExternalLink(hdf5_in, imstack.data.name)
         df[group]['header'] = h5py.ExternalLink(hdf5_in, imstack.group['header'].name)
 
+    # reopen as readonly
+    df = h5py.File(HDF5_OUT % (basename, opts.suffix), 'r')
     # write out fits files
     for i in range(N_MOMENTS):
         hdu = fits.PrimaryHDU(out_data[:, :, i].reshape((1, 1, data_y, data_x)))
-        for k, v in imstack.header.items():
+        for k, v in df[group]['moments'].attrs.items():
             hdu.header[k] = v.decode('ascii') if isinstance(v, bytes) else v
-        if opts.trim != 0:
-            hdu.header['CRPIX1'] -= trim_x*chunk_x
-            hdu.header['CRPIX2'] -= trim_y*chunk_y
-        hdu.header["MOMENT"] = i
-        if opts.filter_lo:
-            hdu.header['LOFILT'] = FILTER.__name__
-            hdu.header['LOORDER'] = FILTER_ORDER
-            hdu.header['LOCUTOF'] = FILTER_CUTOFF
-        if opts.filter_hi:
-            hdu.header['HIFILT'] = FILTER_HI.__name__
-            hdu.header['HIORDER'] = FILTER_HI_ORDER
-            hdu.header['HICUTOFF'] = FILTER_HI_CUTOFF
         hdu.writeto(FITS_OUT % (basename, opts.freq if opts.freq is not None else "", opts.suffix, i+1))
     print("Master done")
 else:
