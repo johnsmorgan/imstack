@@ -9,7 +9,7 @@ import h5py
 from imstack import ImageStack
 from time import sleep
 
-HDF5_OUT = "%s%s_moments.hdf5"
+HDF5_OUT = "%s_%s_moments.hdf5"
 IMAGE_TYPE='image'
 N_MOMENTS=4
 FITS_OUT="%s_%s%s_moment%d.fits"
@@ -42,6 +42,7 @@ parser.add_option("--start", default=0, dest="start", type="int", help="start ti
 parser.add_option("--stop", default=None, dest="stop", type="int", help="stop timestep [default last]")
 parser.add_option("--trim", default=0, dest="trim", type="int", help="skip this number of pixels on each the edge of the image")
 parser.add_option("--remove_zeros", action="store_true", dest="remove_zeros", help="unless overridden with this flag, central pixel is checked for exact zeros and these timesteps are excised.")
+parser.add_option("--pols", action="store_true", dest="pols", help="treat polarisations separately")
 
 opts, args = parser.parse_args()
 hdf5_in= args[0]
@@ -84,7 +85,7 @@ if os.path.exists(HDF5_OUT % (basename, opts.suffix)):
         assert not group in df.keys(), "output hdf5 file already contains this %s" % opts.freq
     
 for i in range(N_MOMENTS):
-    out_fits = FITS_OUT % (basename, opts.freq if opts.freq is not None else "", opts.suffix, i+1)
+    out_fits = FITS_OUT % (basename, opts.freq+'_' if opts.freq is not None else "", opts.suffix, i+1)
     assert os.path.exists(out_fits) is False, "output fits file %s exists" % out_fits
 
 chunk_x = imstack.data.chunks[2]
