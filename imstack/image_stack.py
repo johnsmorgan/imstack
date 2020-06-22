@@ -67,6 +67,8 @@ class ImageStack(object):
             self.steps = [0, self.data.shape[-1]]
         else:
             self.steps = [steps[0], steps[1]]
+            if self.steps[1] is None:
+                self.steps[1] = self.data.shape[-1]
 
     def update(self, freq=None, image_type=None, steps=None):
         if freq is not None:
@@ -82,6 +84,8 @@ class ImageStack(object):
 
         if steps is not None:
             self.steps = [steps[0], steps[1]]
+            if self.steps[1] is None:
+                self.steps[1] = self.data.shape[-1]
 
     def check_slice(self, x, y, margin=0):
         """
