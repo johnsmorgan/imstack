@@ -45,6 +45,7 @@ parser.add_option("--stop", default=None, dest="stop", type="int", help="stop ti
 parser.add_option("--trim", default=0, dest="trim", type="int", help="skip this number of pixels on each the edge of the image")
 parser.add_option("--remove_zeros", action="store_true", dest="remove_zeros", help="unless overridden with this flag, central pixel is checked for exact zeros and these timesteps are excised.")
 parser.add_option("--pols", action="store_true", dest="pol", help="treat polarisations separately")
+parser.add_option("--first_diff", action="store_true", dest="first_diff", help="use first difference for timeseries")
 
 opts, args = parser.parse_args()
 hdf5_in= args[0]
@@ -162,6 +163,7 @@ if rank == 0:
         moments.attrs['TSSTOP'] = np.int(imstack.steps[1])
         moments.attrs['TRIM'] = True if opts.trim else False
         moments.attrs['REMOVE0'] = True if opts.remove_zeros else False
+        moments.attrs['DIFF1'] = True if opts.first_diff else False
 
         # provide links to time-series file
         df[group]['beam'] = h5py.ExternalLink(hdf5_in, imstack.group['beam'].name)
@@ -206,6 +208,8 @@ else:
         if opts.remove_zeros:
             ts_data = np.delete(ts_data, zero_filter, axis=-1)
         # mean
+        if opts.first_diff:
+            ts_data = ts_data[..., 1:] - ts_data[..., :-1]
         data[..., 0] = np.average(ts_data, axis=-1)
         if N_MOMENTS > 2:
             if opts.filter_lo:
