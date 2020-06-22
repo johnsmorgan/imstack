@@ -13,8 +13,10 @@ HDF5_OUT = "%s_%s_moments.hdf5"
 IMAGE_TYPE='image'
 N_MOMENTS=4
 FITS_OUT="%s_%s%s_moment%d.fits"
+POL_FITS_OUT="%s_%s%s_moment%d-%s.fits"
 VERSION='0.1'
 POLS=['XX', 'YY']
+N_POLS=len(POLS)
 
 FILTER_ORDER = 2
 FILTER_CUTOFF = 1/20.
@@ -42,7 +44,7 @@ parser.add_option("--start", default=0, dest="start", type="int", help="start ti
 parser.add_option("--stop", default=None, dest="stop", type="int", help="stop timestep [default last]")
 parser.add_option("--trim", default=0, dest="trim", type="int", help="skip this number of pixels on each the edge of the image")
 parser.add_option("--remove_zeros", action="store_true", dest="remove_zeros", help="unless overridden with this flag, central pixel is checked for exact zeros and these timesteps are excised.")
-parser.add_option("--pols", action="store_true", dest="pols", help="treat polarisations separately")
+parser.add_option("--pols", action="store_true", dest="pol", help="treat polarisations separately")
 
 opts, args = parser.parse_args()
 hdf5_in= args[0]
@@ -85,8 +87,13 @@ if os.path.exists(HDF5_OUT % (basename, opts.suffix)):
         assert not group in df.keys(), "output hdf5 file already contains this %s" % opts.freq
     
 for i in range(N_MOMENTS):
-    out_fits = FITS_OUT % (basename, opts.freq+'_' if opts.freq is not None else "", opts.suffix, i+1)
-    assert os.path.exists(out_fits) is False, "output fits file %s exists" % out_fits
+    if not opts.pol:
+        out_fits = FITS_OUT % (basename, opts.freq+'_' if opts.freq is not None else "", opts.suffix, i+1)
+        assert os.path.exists(out_fits) is False, "output fits file %s exists" % out_fits
+    else:
+        for pol in POLS:
+            out_fits = POL_FITS_OUT % (basename, opts.freq+'_' if opts.freq is not None else "", opts.suffix, i+1, pol)
+            assert os.path.exists(out_fits) is False, "output fits file %s exists" % out_fits
 
 chunk_x = imstack.data.chunks[2]
 chunk_y = imstack.data.chunks[1]
@@ -106,7 +113,10 @@ if rank == 0:
     if remainder_y != 0:
         print("trim_y reduced by {} to make a integer number of chunks".format(remainder_y))
     completed = [False for i in range(total_chunks)]
-    out_data = np.zeros((data_y, data_x, N_MOMENTS), dtype=np.float32)
+    if not opts.pol:
+        out_data = np.zeros((data_y, data_x, N_MOMENTS), dtype=np.float32)
+    else:
+        out_data = np.zeros((data_y, data_x, N_MOMENTS, N_POLS), dtype=np.float32)
     while sum(completed) < total_chunks:
         data = comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=status)
         source = status.Get_source()
@@ -128,9 +138,12 @@ if rank == 0:
             df.create_group(group)
         else:
             group="/"
-        moments = df[group].create_dataset("moments", (data_y, data_x, 1, N_MOMENTS), dtype=np.float32, compression='gzip', shuffle=True)
+        if not opts.pol:
+            moments = df[group].create_dataset("moments", (data_y, data_x, 1, N_MOMENTS), dtype=np.float32, compression='gzip', shuffle=True)
+        else:
+            moments = df[group].create_dataset("moments", (data_y, data_x, 1, N_MOMENTS, N_POLS), dtype=np.float32, compression='gzip', shuffle=True)
         #removed track_order=True as it gives an error, this will mean that the header is in alphabetical order
-        moments[:, :, 0, :] = out_data
+        moments[:, :, 0, ...] = out_data
         for k, v in imstack.header.items():
             moments.attrs[k] = v
         if opts.trim != 0:
@@ -157,17 +170,27 @@ if rank == 0:
 
     # reopen as readonly
     df = h5py.File(HDF5_OUT % (basename, opts.suffix), 'r')
+
     # write out fits files
+    hdu = fits.PrimaryHDU(np.zeros((1, 1, data_y, data_x)))
     for i in range(N_MOMENTS):
-        hdu = fits.PrimaryHDU(out_data[:, :, i].reshape((1, 1, data_y, data_x)))
         for k, v in df[group]['moments'].attrs.items():
             hdu.header[k] = v.decode('ascii') if isinstance(v, bytes) else v
-        hdu.writeto(FITS_OUT % (basename, opts.freq if opts.freq is not None else "", opts.suffix, i+1))
+        if not opts.pol:
+            hdu.data = out_data[:, :, i].reshape((1, 1, data_y, data_x))
+            hdu.writeto(FITS_OUT % (basename, opts.freq if opts.freq is not None else "", opts.suffix, i+1))
+        else:
+            for p, pol in enumerate(POLS):
+                hdu.data = out_data[:, :, i, p].reshape((1, 1, data_y, data_x))
+                hdu.writeto(POL_FITS_OUT % (basename, opts.freq if opts.freq is not None else "", opts.suffix, i+1, pol))
     print("Master done")
 else:
     indexes = range(rank-1, total_chunks, size-1)
     print("Worker rank {} processing {} chunks".format(rank, len(indexes)))
-    data = np.zeros((chunk_y, chunk_x, N_MOMENTS))
+    if not opts.pol:
+        data = np.zeros((chunk_y, chunk_x, N_MOMENTS))
+    else:
+        data = np.zeros((N_POLS, chunk_y, chunk_x, N_MOMENTS))
     # this should minimise disk reads by reading adjacent parts of the file at approximately the same time
     # i.e. processes 1-N will read chunks 1-N at about the same time
     if opts.remove_zeros:
@@ -177,25 +200,28 @@ else:
         slice_x, slice_y = index_to_chunk(index, chunk_x, data_x, trim_x, chunk_y, data_y, trim_y, True)
         #                            NB switched order below
         try:
-            ts_data = imstack.slice2cube(slice_x, slice_y, correct=opts.pbcor)
+            ts_data = imstack.slice2cube(slice_x, slice_y, avg_pol=not opts.pol, correct=opts.pbcor)
         except ZeroDivisionError:
             ts_data = np.nan*np.ones((chunk_y, chunk_x, 20))
         if opts.remove_zeros:
-            ts_data = np.delete(ts_data, zero_filter, axis=2)
+            ts_data = np.delete(ts_data, zero_filter, axis=-1)
         # mean
-        data[..., 0] = np.average(ts_data, axis=2)
+        data[..., 0] = np.average(ts_data, axis=-1)
         if N_MOMENTS > 2:
             if opts.filter_lo:
-                ts_data = filtfilt(bb, ab, ts_data, axis=2)
-            data[..., 2] = skew(ts_data, axis=2)
+                ts_data = filtfilt(bb, ab, ts_data, axis=-1)
+            data[..., 2] = skew(ts_data, axis=-1)
         if N_MOMENTS > 3:
-            data[..., 3] = kurtosis(ts_data, axis=2)
+            data[..., 3] = kurtosis(ts_data, axis=-1)
         if N_MOMENTS > 1:
             if N_MOMENTS == 1:
                 if opts.filter_lo:
-                    ts_data = filtfilt(bb, ab, ts_data, axis=2)
+                    ts_data = filtfilt(bb, ab, ts_data, axis=-1)
             if opts.filter_hi:
-                ts_data = filtfilt(bb_hi, ab_hi, ts_data, axis=2)
-            data[..., 1] = np.std(ts_data, axis=2)
-        comm.send(data, dest=0, tag=index)
+                ts_data = filtfilt(bb_hi, ab_hi, ts_data, axis=-1)
+            data[..., 1] = np.std(ts_data, axis=-1)
+        if not opts.pol:
+            comm.send(data, dest=0, tag=index)
+        else:
+            comm.send(np.moveaxis(data, 0, -1), dest=0, tag=index)
     print("Worker rank {} done".format(rank))
