@@ -161,7 +161,7 @@ if rank == 0:
         moments.attrs['PBCOR'] = True if opts.pbcor else False
         moments.attrs['TSSTART'] = np.int(imstack.steps[0])
         moments.attrs['TSSTOP'] = np.int(imstack.steps[1])
-        moments.attrs['TRIM'] = True if opts.trim else False
+        moments.attrs['TRIM'] = np.int(opts.trim)
         moments.attrs['REMOVE0'] = True if opts.remove_zeros else False
         moments.attrs['DIFF1'] = True if opts.first_diff else False
 
@@ -180,7 +180,7 @@ if rank == 0:
             hdu.header[k] = v.decode('ascii') if isinstance(v, bytes) else v
         if not opts.pol:
             hdu.data = out_data[:, :, i].reshape((1, 1, data_y, data_x))
-            hdu.writeto(FITS_OUT % (basename, opts.freq if opts.freq is not None else "", opts.suffix, i+1))
+            hdu.writeto(FITS_OUT % (basename, opts.freq+'_' if opts.freq is not None else "", opts.suffix, i+1))
         else:
             for p, pol in enumerate(POLS):
                 hdu.data = out_data[:, :, i, p].reshape((1, 1, data_y, data_x))
