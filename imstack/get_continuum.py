@@ -20,6 +20,7 @@ if __name__ == '__main__':
     parser.add_option("-v", "--verbose", action="count", default=0, dest="verbose", help="-v info, -vv debug")
     parser.add_option("--overwrite", action="store_true", dest="overwrite", help="overwrite outfile if it exists")
     parser.add_option("--corrected", action="store_true", dest="corrected", help="produce primary beam-corrected image")
+    parser.add_option("--sigma", action="store_true", dest="sigma", help="weight polarisations according to noise")
 
     opts, args = parser.parse_args()
 
@@ -36,7 +37,7 @@ if __name__ == '__main__':
 
     logging.debug("opening hdf5 file")
     imstack = ImageStack(imstack_path, freq=chan_str)
-    cont = imstack.get_continuum(True, opts.corrected)
+    cont = np.float32(imstack.get_continuum(True, opts.corrected, opts.sigma))
     hdu = fits.PrimaryHDU(cont[np.newaxis, np.newaxis, ...])
     for key, item in imstack.group['continuum'].attrs.items(): 
         hdu.header[key] = item

@@ -34,20 +34,21 @@ def hypotn(d, axis=0):
     """
     return np.sqrt(np.sum(d**2, axis=axis))
 
-def sault_weight(data, beam, correct=False):
+def sault_weight(data, beam, sigma, correct=False):
     """
     For combining data from multiple pointings / polarisations
 
-    Essentially 1996A&AS..120..375S Equation 1, but simplified to assume equal noise for both polarisations.
+    See 1996A&AS..120..375S Equation 1.
     Pointing / Polarisation must be first axis for both data and beam
     """
     while len(data.shape) > len(beam.shape):
         beam = beam[..., np.newaxis]
-
-    data_weighted = np.average(data/beam, axis=0, weights=beam**2)
+    while len(data.shape) > len(sigma.shape):
+        sigma = sigma[..., np.newaxis]
+    d = np.sum(data*beam/sigma**2, axis=0)/np.sum(beam**2/sigma**2, axis=0)
     if correct is True:
-        return data_weighted
-    return data_weighted*hypotn(beam)/np.sqrt(len(beam))
+        return d
+    return d*(np.sum(beam**2/sigma**2, axis=0)/np.sum(sigma**-2))**0.5
 
 class ImageStack(object):
     def __init__(self, h5filename, image_type='image', freq=None, steps=None, mode='r'):
@@ -69,6 +70,16 @@ class ImageStack(object):
             self.steps = [steps[0], steps[1]]
             if self.steps[1] is None:
                 self.steps[1] = self.data.shape[-1]
+        if 'SIGMA' in self.group['beam'].attrs:
+            self.sigma = self.group['beam'].attrs['SIGMA']
+        else:
+            self.sigma = np.array((1.0, 1.0))
+        print(f"sigma={self.sigma})")
+        if 'SCALE' in self.group['beam'].attrs:
+            self.scale = self.group['beam'].attrs['SCALE']
+        else:
+            self.scale = np.array([1.0])
+        print(f"scale={self.scale})")
 
     def update(self, freq=None, image_type=None, steps=None):
         if freq is not None:
@@ -135,9 +146,9 @@ class ImageStack(object):
 
     def scale_beam(self, beam):
             if len(beam.shape) == 1:
-                return beam * self.get_scale()
+                return beam * self.get_scale()[:, 0, 0, self.channel, 0]
             elif len(beam.shape) == 3:
-                return beam * self.get_scale()
+                return beam * self.get_scale()[..., self.channel, 0]
             else:
                 raise RuntimeError("don't know how to deal with beam shape %s" % (beam.shape))
 
@@ -173,7 +184,7 @@ class ImageStack(object):
         ts = self.data[:, y, x, self.channel, self.steps[0]:self.steps[1]].astype(np.float_)
         if avg_pol is True:
             beam = self.pix2beam(x, y, False)
-            return sault_weight(ts, beam, correct)
+            return sault_weight(ts, beam, self.sigma, correct)
         else:
             if correct is True:
                 beam = self.pix2beam(x, y, False)
@@ -200,13 +211,9 @@ class ImageStack(object):
         avg_pol=False, correct=False Return both polarisations, no primary beam correction
         """
         ts = self.data[:, y_slice, x_slice, self.channel, self.steps[0]:self.steps[1]].astype(np.float_)
-        _, beam = np.broadcast_arrays(ts, self.pix2beam(x_slice, y_slice, False)[..., np.newaxis])
+        beam = self.pix2beam(x_slice, y_slice, False)
         if avg_pol is True:
-            ts = np.average(ts/beam, axis=0, weights=beam**2)
-            if correct is True:
-                return ts
-            
-            return ts*np.hypot(beam[0, ...], beam[1, ...])
+            return sault_weight(ts, beam, self.sigma, correct)
         else:
             if correct is True:
                 return ts/beam
@@ -243,7 +250,7 @@ class ImageStack(object):
             #cube has axes pol, x, y, time
             return semihex(cube.reshape(cube.shape[0], cube.shape[1]*cube.shape[2], cube.shape[3]), axis=1)
 
-    def get_continuum(self, avg_pol=True, correct=True):
+    def get_continuum(self, avg_pol=True, correct=True, sigma=True):
         """
         Generate continuum image.
         """
@@ -251,8 +258,12 @@ class ImageStack(object):
         self.header = self.group['header'].attrs
         cont = self.group['continuum'][:, :, :, self.channel, 0]
         beam = self.group['beam'][:, :, :, self.channel, 0]
+        if sigma is True:
+            sigma = self.sigma
+        else:
+            sigma = np.array((1.0, 1.0))
         if avg_pol is True:
-            return sault_weight(cont, beam, correct)
+            return sault_weight(cont, beam, sigma, correct)
         else:
             if correct is True:
                 return cont/beam[:, np.newaxis]
