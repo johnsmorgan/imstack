@@ -168,7 +168,7 @@ class ImageStack(object):
         if avg_pol is True:
             if not np.any(beam):
                 return 0.0
-            return np.average(1/beam, weights=beam**2)**-1
+            return sault_beam(beam, self.sigma)
         else:
             return beam
 
