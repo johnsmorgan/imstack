@@ -34,6 +34,12 @@ def hypotn(d, axis=0):
     """
     return np.sqrt(np.sum(d**2, axis=axis))
 
+def sault_beam(beam, sigma):
+    """
+    combine beams with sault weighting
+    """
+    return (np.sum(beam**2/sigma**2, axis=0)/np.sum(sigma**-2))**0.5
+
 def sault_weight(data, beam, sigma, correct=False):
     """
     For combining data from multiple pointings / polarisations
@@ -48,7 +54,7 @@ def sault_weight(data, beam, sigma, correct=False):
     d = np.sum(data*beam/sigma**2, axis=0)/np.sum(beam**2/sigma**2, axis=0)
     if correct is True:
         return d
-    return d*(np.sum(beam**2/sigma**2, axis=0)/np.sum(sigma**-2))**0.5
+    return d*sault_beam(beam, sigma)
 
 class ImageStack(object):
     def __init__(self, h5filename, image_type='image', freq=None, steps=None, mode='r'):
