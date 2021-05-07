@@ -148,7 +148,7 @@ class ImageStack(object):
     def get_scale(self):
         if 'SCALE' in self.group['beam'].attrs:
             return self.group['beam'].attrs['SCALE']
-        return 1.0
+        return np.array([[1.0]])
 
     def scale_beam(self, beam):
             if len(beam.shape) == 1:
