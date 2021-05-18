@@ -95,7 +95,7 @@ for band in opts.bands:
                         logging.info("couldn't find file %s: reducing n from %d to %d", infile, opts.n, new_n)
                         opts.n = new_n
                         break
-                    raise IOError, "couldn't find file %s" % infile
+                    raise IOError("couldn't find file %s" % infile)
                 logging.debug("%s found", infile)
             else:
                 #no break out of pol loop, continue
@@ -112,7 +112,7 @@ if not opts.skip_beam:
             else:
                 pbfile = PB_FILE_BAND.format(obsid=obsid, band=band, pol=pol)
             if not os.path.exists(pbfile):
-                raise IOError, "couldn't find file %s" % pbfile
+                raise IOError("couldn't find file %s" % pbfile)
             logging.debug("%s found", pbfile)
 
 if opts.check_filenames_only:
