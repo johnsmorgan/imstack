@@ -163,11 +163,13 @@ class ImageStack(object):
         get beam corresponding to x,y
         """
         beam = self.group['beam'][:, y, x, self.channel, 0]
+        print(avg_pol)
         if scale == True:
             beam = self.scale_beam(beam)
         if avg_pol is True:
             if not np.any(beam):
                 return 0.0
+            print('sault')
             return sault_beam(beam, self.sigma)
         else:
             return beam
@@ -276,7 +278,6 @@ class ImageStack(object):
             return cont
 
 if __name__ == "__main__":
-    """
     run tests
     """
     import doctest
