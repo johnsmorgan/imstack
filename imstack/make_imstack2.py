@@ -42,9 +42,9 @@ parser.add_option("--pb_thresh", default=PB_THRESHOLD, dest="pb_thresh", type="f
 parser.add_option("--stamp_size", default=STAMP_SIZE, dest="stamp_size", type="int", help="hdf5 stamp size [default: %default]")
 parser.add_option("--skip_beam", action="store_true", dest="skip_beam", help="don't include beam")
 parser.add_option("--check_filenames_only", action="store_true", dest="check_filenames_only", help="check all required files are present then quit.")
-parser.add_option("--allow_missing", action="store_true", dest="allow_missing", help="check for presence of files for contiguous timesteps from --start up to -n")
+parser.add_option("--allow_missing", action="store_true", dest="allow_missing", help="check for presence of files for contiguous timesteps from --start up to -n. If a file is missing, n is truncated to the first contiguous set of files")
 parser.add_option("--old_wsc_timesteps", action="store_true", dest="old_wcs_timesteps", help="use old WSClean timesteps to check files")
-parser.add_option("-v", "--verbose", action="count", dest="verbose", help="-v info, -vv debug")
+parser.add_option("-v", "--verbose", action="count", dest="verbose", default=0, help="-v info, -vv debug")
 
 opts, args = parser.parse_args()
 
@@ -83,7 +83,7 @@ if opts.old_wcs_timesteps:
 # check that all image files are present
 for band in opts.bands:
     for suffix in opts.suffixes:
-        for t in xrange(opts.start, opts.n+opts.start):
+        for t in range(opts.start, opts.n+opts.start):
             for p in opts.pols:
                 if band is None:
                     infile = FILENAME.format(obsid=obsid, prefix=opts.prefix, time=t, pol=p, suffix=suffix)
@@ -95,7 +95,7 @@ for band in opts.bands:
                         logging.info("couldn't find file %s: reducing n from %d to %d", infile, opts.n, new_n)
                         opts.n = new_n
                         break
-                    raise IOError, "couldn't find file %s" % infile
+                    raise IOError("couldn't find file %s" % infile)
                 logging.debug("%s found", infile)
             else:
                 #no break out of pol loop, continue
@@ -112,7 +112,7 @@ if not opts.skip_beam:
             else:
                 pbfile = PB_FILE_BAND.format(obsid=obsid, band=band, pol=pol)
             if not os.path.exists(pbfile):
-                raise IOError, "couldn't find file %s" % pbfile
+                raise IOError("couldn't find file %s" % pbfile)
             logging.debug("%s found", pbfile)
 
 if opts.check_filenames_only:
@@ -123,7 +123,7 @@ settings = list(propfaid.get_cache())
 settings[2] *= CACHE_SIZE
 propfaid.set_cache(*settings)
 
-with contextlib.closing(h5py.h5f.create(opts.outfile, fapl=propfaid)) as fid:
+with contextlib.closing(h5py.h5f.create(opts.outfile.encode("utf-8"), fapl=propfaid)) as fid:
     df = h5py.File(fid, file_mode)
 
 df.attrs['VERSION'] = VERSION
@@ -161,7 +161,7 @@ for band in opts.bands:
             else:
                 hdus = fits.open(PB_FILE_BAND.format(obsid=obsid, band=band, pol=pol), memmap=True)
             beam[p, :, :, 0, 0] = hdus[HDU].data[SLICE]
-            for key, item in hdus[0].header.iteritems():
+            for key, item in hdus[0].header.items():
                 beam.attrs[key] = item
         pb_sum = np.sqrt(np.sum(beam[...]**2, axis=0)/len(opts.pols))
         pb_mask = pb_sum > opts.pb_thresh*np.nanmax(pb_sum)
@@ -183,7 +183,7 @@ for band in opts.bands:
     # add fits header to attributes
     hdus = fits.open(header_file, memmap=True)
     header = group.create_dataset('header', data=[], dtype=DTYPE)
-    for key, item in hdus[0].header.iteritems():
+    for key, item in hdus[0].header.items():
         header.attrs[key] = item
 
     for s, suffix in enumerate(opts.suffixes):
@@ -198,7 +198,7 @@ for band in opts.bands:
 
         n_rows = image_size
         i=0
-        for t in xrange(opts.n):
+        for t in range(opts.n):
             im_slice = [slice(n_rows*i, n_rows*(i+1)), slice(None, None, None)]
             fits_slice = SLICE[:-2] + im_slice
 
@@ -210,13 +210,13 @@ for band in opts.bands:
                     infile = FILENAME_BAND.format(obsid=obsid, band=band, prefix=opts.prefix, time=t+opts.start, pol=pol, suffix=suffix)
                 logging.info(" processing %s", infile)
                 hdus = fits.open(infile, memmap=True)
-                filenames[p, 0, t] = infile
+                filenames[p, 0, t] = infile.encode("utf-8")
                 data[p, n_rows*i:n_rows*(i+1), :, 0, t] = np.where(pb_mask[n_rows*i:n_rows*(i+1), :, 0, 0],
                                                                    hdus[0].data[fits_slice],
                                                                    np.nan)*pb_nan[n_rows*i:n_rows*(i+1), :, 0, 0]
 
                 if s == 0 and p == 0:
-                    timestamp[t] = hdus[0].header['DATE-OBS']
+                    timestamp[t] = hdus[0].header['DATE-OBS'].encode("utf-8")
                     if opts.old_wcs_timesteps:
                         timestep_start[t] = hdus[0].header['WSCTIMES']
                         timestep_stop[t] = hdus[0].header['WSCTIMEE']
@@ -224,7 +224,7 @@ for band in opts.bands:
                         timestep_start[t] = t
                         timestep_stop[t] = t+1
                 else:
-                    assert timestamp[t] == hdus[0].header['DATE-OBS'], "Timesteps do not match %s in %s" % (opts.suffixes[0], infile)
+                    assert timestamp[t] == hdus[0].header['DATE-OBS'].encode("utf-8"), "Timesteps do not match %s in %s" % (opts.suffixes[0], infile)
         logging.info(" writing to hdf5 file")
         hdf5_data = group.create_dataset(suffix, data_shape, chunks=chunks, dtype=DTYPE, compression='lzf', shuffle=True)
         hdf5_data[...] = data
