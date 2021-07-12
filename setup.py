@@ -6,7 +6,8 @@ with open("README.md", "r") as fh:
 reqs = ['h5py>=2.10',
         'numpy>=1.18',
         'scipy>=1.4',
-        'astropy>=4.0']
+        'astropy>=4.0'
+        'psutil>=5.8']
 setuptools.setup(
     name="imstack", # Replace with your own username
     version="0.2.0",
