@@ -275,6 +275,21 @@ class ImageStack(object):
                 return cont/beam
             return cont
 
+    def get_beam(self, sigma=True):
+        """
+        Get properly weighted beam
+        """
+
+        self.header = self.group['header'].attrs
+        beam = self.group['beam'][:, :, :, self.channel, 0]
+        if sigma is True:
+            sigma = self.sigma
+        else:
+            sigma = np.array((1.0, 1.0))
+        while len(beam.shape) > len(sigma.shape):
+            sigma = sigma[..., np.newaxis]
+        return sault_beam(beam, sigma)
+
 if __name__ == "__main__":
     """
     run tests
