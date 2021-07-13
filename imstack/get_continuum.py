@@ -13,7 +13,7 @@ N_POL = 2
 POLS = ("XX", "YY")
 
 if __name__ == '__main__':
-    parser = OptionParser(usage="usage: get_continuum.py image_stack.hdf5 chanstring outfile" +
+    parser = OptionParser(usage="usage: get_continuum.py image_stack.hdf5 chan_str outfile" +
                           """
                           calculate (Stokes-I) image from image stack and write to fits file.
                           """)
@@ -21,6 +21,7 @@ if __name__ == '__main__':
     parser.add_option("--overwrite", action="store_true", dest="overwrite", help="overwrite outfile if it exists")
     parser.add_option("--corrected", action="store_true", dest="corrected", help="produce primary beam-corrected image")
     parser.add_option("--sigma", action="store_true", dest="sigma", help="weight polarisations according to noise")
+    parser.add_option("--image_type", dest="image_type", default='image', help="image type[default=%default]")
 
     opts, args = parser.parse_args()
 
@@ -36,7 +37,7 @@ if __name__ == '__main__':
         logging.basicConfig(format='%(asctime)s-%(levelname)s %(message)s', level=logging.DEBUG)
 
     logging.debug("opening hdf5 file")
-    imstack = ImageStack(imstack_path, freq=chan_str)
+    imstack = ImageStack(imstack_path, freq=chan_str, image_type=opts.image_type)
     cont = np.float32(imstack.get_continuum(True, opts.corrected, opts.sigma))
     hdu = fits.PrimaryHDU(cont[np.newaxis, np.newaxis, ...])
     for key, item in imstack.group['continuum'].attrs.items(): 

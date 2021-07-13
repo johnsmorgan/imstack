@@ -12,21 +12,20 @@ N_POL = 2
 POLS = ("XX", "YY")
 
 if __name__ == '__main__':
-    parser = OptionParser(usage="usage: add_continuum.py hdf5 prefix chanstring suffix" +
+    parser = OptionParser(usage="usage: add_continuum.py hdf5 prefix suffix" +
                           """
-                           read [prefix]_chanstring-XX-suffix.fits and [prefix]_chanstring-YY-suffix.fits into hdf5
+                           read [prefix]-XX-suffix.fits and [prefix]-YY-suffix.fits into hdf5
                           """)
     parser.add_option("-v", "--verbose", action="count", default=0, dest="verbose", help="-v info, -vv debug")
     parser.add_option("--overwrite", action="store_true", dest="overwrite", help="delete continuum images if they already exist")
 
     opts, args = parser.parse_args()
 
-    if len(args) != 4:
+    if len(args) != 3:
         parser.error("incorrect number of arguments")
     imstack_path = args[0]
     prefix = args[1]
-    chan_str = args[2]
-    suffix = args[3]
+    suffix = args[2]
 
     if opts.verbose == 1:
         logging.basicConfig(format='%(asctime)s-%(levelname)s %(message)s', level=logging.INFO)
@@ -37,8 +36,13 @@ if __name__ == '__main__':
 
     logging.debug("opening hdf5 file")
     with File(imstack_path, 'a') as imstack:
-        group = imstack[chan_str]
-        data_shape = list(group['image'].shape)
+        group = imstack['/']
+        for primary_suffix in ('image', 'dirty', 'model', 'psf', None):
+            if primary_suffix in group.keys():
+                break
+        if primary_suffix is None:
+            raise RuntimeError("Cannot find primary image to determine image parameters")
+        data_shape = list(group[primary_suffix].shape)
         logging.debug("data shape %s", data_shape)
         cont_shape = data_shape[:-1] + [1] # by definition just one continuum image for all timesteps
         logging.debug("continuum shape %s", cont_shape)
@@ -52,8 +56,8 @@ if __name__ == '__main__':
         else:
             cont = group.create_dataset("continuum", cont_shape, dtype=np.float32, compression='lzf', shuffle=True)
 
-        hdus_x = fits.open("%s_%s-XX-%s.fits" % (prefix, chan_str, suffix))
-        hdus_y = fits.open("%s_%s-YY-%s.fits" % (prefix, chan_str, suffix))
+        hdus_x = fits.open("%s-XX-%s.fits" % (prefix, suffix))
+        hdus_y = fits.open("%s-YY-%s.fits" % (prefix, suffix))
 
         logging.debug("writing header")
         for key, item in hdus_x[0].header.items():

@@ -138,6 +138,16 @@ class ImageStack(object):
             pixcoord = np.round(pixcoord).astype(np.int)
         return pixcoord[0, 0], pixcoord[0, 1]
 
+    def pix2world(self, x, y):
+        """
+        return pixel coordinates x, y
+        NB x is the fastest varying axis!
+        """
+        ra_dec = self.wcs.celestial.wcs_world2pix(np.array([[x, y]]), 0)
+        if floor:
+            pixcoord = np.round(pixcoord).astype(np.int)
+        return pixcoord[0, 0], pixcoord[0, 1]
+
     def get_pixel_beam(self):
         """
         Get size of *synthesised* beam in pixels.
@@ -152,9 +162,7 @@ class ImageStack(object):
 
     def scale_beam(self, beam):
             if len(beam.shape) == 1:
-                return beam * self.get_scale()[:, 0, 0, self.channel, 0]
-            elif len(beam.shape) == 3:
-                return beam * self.get_scale()[..., self.channel, 0]
+                return beam * self.get_scale()
             else:
                 raise RuntimeError("don't know how to deal with beam shape %s" % (beam.shape))
 
@@ -164,7 +172,7 @@ class ImageStack(object):
         """
         beam = self.group['beam'][:, y, x, self.channel, 0]
         print(avg_pol)
-        if scale == True:
+        if scale is True:
             beam = self.scale_beam(beam)
         if avg_pol is True:
             if not np.any(beam):
