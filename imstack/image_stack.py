@@ -266,7 +266,7 @@ class ImageStack(object):
             #cube has axes pol, x, y, time
             return semihex(cube.reshape(cube.shape[0], cube.shape[1]*cube.shape[2], cube.shape[3]), axis=1)
 
-    def get_continuum(self, avg_pol=True, correct=True, sigma=True):
+    def get_continuum(self, avg_pol=True, correct=True, sigma_weight=True, scale=True):
         """
         Generate continuum image.
         """
@@ -274,7 +274,9 @@ class ImageStack(object):
         self.header = self.group['header'].attrs
         cont = self.group['continuum'][:, :, :, self.channel, 0]
         beam = self.group['beam'][:, :, :, self.channel, 0]
-        if sigma is True:
+        if scale == True:
+            beam = self.scale_beam(beam)
+        if sigma_weight is True:
             sigma = self.sigma
         else:
             sigma = np.array((1.0, 1.0))
@@ -282,8 +284,23 @@ class ImageStack(object):
             return sault_weight(cont, beam, sigma, correct)
         else:
             if correct is True:
-                return cont/beam[:, np.newaxis]
+                return cont/beam
             return cont
+
+    def get_beam(self, sigma=True):
+        """
+        Get properly weighted beam
+        """
+
+        self.header = self.group['header'].attrs
+        beam = self.group['beam'][:, :, :, self.channel, 0]
+        if sigma is True:
+            sigma = self.sigma
+        else:
+            sigma = np.array((1.0, 1.0))
+        while len(beam.shape) > len(sigma.shape):
+            sigma = sigma[..., np.newaxis]
+        return sault_beam(beam, sigma)
 
 if __name__ == "__main__":
     run tests
