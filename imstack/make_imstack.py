@@ -111,10 +111,7 @@ pb_nan = np.ones(data_shape[1:-1] + [1])
 timestep_start = group.create_dataset("timestep_start", (opts.n,), dtype=np.uint16)
 timestep_stop = group.create_dataset("timestep_stop", (opts.n,), dtype=np.uint16)
 timestamp = group.create_dataset("timestamp", (opts.n,), dtype="S21")
-if band is None:
-    header_file = FILENAME.format(prefix=prefix, time=opts.n//2, suffix=opts.suffixes[0])
-else:
-    header_file = FILENAME_BAND.format(prefix=prefix, time=opts.n//2, suffix=opts.suffixes[0])
+header_file = FILENAME.format(prefix=prefix, time=opts.n//2, suffix=opts.suffixes[0])
 
 # add fits header to attributes
 hdus = fits.open(header_file, memmap=True)
