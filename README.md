@@ -1,3 +1,5 @@
+**NB this branch is streamlined for use on GLEAM data. `make_imstack` makes more assumptions than the main branch currently does. In particular, it expects just a single polarisation.**
+
 ## Overview 
 Take a set of fits images (which share a World Coordinate System, but span different timesteps, spectral channels, or polarisations) and write the results into an HDF5 file which is disk-space-efficient, stores all relevant metadata, and is optimised for efficient extraction of timeseries (lightcurve) data.
 
