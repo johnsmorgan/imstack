@@ -20,10 +20,11 @@ SUFFIXES = "image,model"
 N_TIMESTEPS = 591
 N_CHANNELS = 1
 DTYPE = np.float16
-FILENAME = "{obsid}-t{time:04d}-{pol}-{suffix}.fits"
-FILENAME_BAND = "{obsid}_{band}-t{time:04d}-{pol}-{suffix}.fits"
+FILENAME = "{obsid}{prefix}-t{time:04d}-{pol}-{suffix}.fits"
+FILENAME_BAND = "{obsid}_{band}{prefix}-t{time:04d}-{pol}-{suffix}.fits"
 PB_FILE = "{obsid}-{pol}-beam.fits"
 PB_FILE_BAND = "{obsid}_{band}-{pol}-beam.fits"
+PREFIX = ""
 
 parser = OptionParser(usage="usage: obsid" +
                       """
@@ -35,6 +36,7 @@ parser.add_option("--step", default=TIME_INTERVAL, dest="step", type="float", he
 parser.add_option("--outfile", default=None, dest="outfile", type="str", help="outfile [default: [obsid].hdf5]")
 parser.add_option("--suffixes", default=SUFFIXES, dest="suffixes", type="str", help="comma-separated list of suffixes to store [default: %default]")
 parser.add_option("--bands", default=None, dest="bands", type="str", help="comma-separated list of contiguous frequency bands [default None]")
+parser.add_option("--prefix", default=PREFIX, dest="prefix", type="str", help="name prefix (comes after obsid_band) [default %default]")
 parser.add_option("--pols", default=POLS, dest="pols", type="str", help="comma-separated list of pols [default: %default]")
 parser.add_option("--pb_thresh", default=PB_THRESHOLD, dest="pb_thresh", type="float", help="flag below this threshold [default: %default]")
 parser.add_option("--stamp_size", default=STAMP_SIZE, dest="stamp_size", type="int", help="hdf5 stamp size [default: %default]")
@@ -49,7 +51,7 @@ opts, args = parser.parse_args()
 if len(args) != 1:
     parser.error("incorrect number of arguments")
 
-obsid = int(args[0])
+obsid = args[0]
 
 if opts.verbose == 1:
     logging.basicConfig(format='%(asctime)s-%(levelname)s %(message)s', level=logging.INFO)
@@ -84,9 +86,9 @@ for band in opts.bands:
         for t in range(opts.start, opts.n+opts.start):
             for p in opts.pols:
                 if band is None:
-                    infile = FILENAME.format(obsid=obsid, time=t, pol=p, suffix=suffix)
+                    infile = FILENAME.format(obsid=obsid, prefix=opts.prefix, time=t, pol=p, suffix=suffix)
                 else:
-                    infile = FILENAME_BAND.format(obsid=obsid, band=band, time=t, pol=p, suffix=suffix)
+                    infile = FILENAME_BAND.format(obsid=obsid, band=band, prefix=opts.prefix, time=t, pol=p, suffix=suffix)
                 if not os.path.exists(infile):
                     if opts.allow_missing:
                         new_n = t-opts.start
@@ -140,9 +142,9 @@ for band in opts.bands:
 
     # determine data size and structure
     if band is None:
-        image_file = FILENAME.format(obsid=obsid, time=opts.start, pol=opts.pols[0], suffix=opts.suffixes[0])
+        image_file = FILENAME.format(obsid=obsid, prefix=opts.prefix, time=opts.start, pol=opts.pols[0], suffix=opts.suffixes[0])
     else:
-        image_file = FILENAME_BAND.format(obsid=obsid, band=band, time=opts.start, pol=opts.pols[0], suffix=opts.suffixes[0])
+        image_file = FILENAME_BAND.format(obsid=obsid, band=band, prefix=opts.prefix, time=opts.start, pol=opts.pols[0], suffix=opts.suffixes[0])
     hdus = fits.open(image_file, memmap=True)
     image_size = hdus[HDU].data.shape[-1]
     assert image_size % opts.stamp_size == 0, "image_size must be divisible by stamp_size"
@@ -175,9 +177,9 @@ for band in opts.bands:
     timestep_stop = group.create_dataset("timestep_stop", (opts.n,), dtype=np.uint16)
     timestamp = group.create_dataset("timestamp", (opts.n,), dtype="S21")
     if band is None:
-        header_file = FILENAME.format(obsid=obsid, time=opts.n//2, pol=opts.pols[0], suffix=opts.suffixes[0])
+        header_file = FILENAME.format(obsid=obsid, prefix=opts.prefix, time=opts.n//2, pol=opts.pols[0], suffix=opts.suffixes[0])
     else:
-        header_file = FILENAME_BAND.format(obsid=obsid, band=band, time=opts.n//2, pol=opts.pols[0], suffix=opts.suffixes[0])
+        header_file = FILENAME_BAND.format(obsid=obsid, band=band, prefix=opts.prefix, time=opts.n//2, pol=opts.pols[0], suffix=opts.suffixes[0])
     # add fits header to attributes
     hdus = fits.open(header_file, memmap=True)
     header = group.create_dataset('header', data=[], dtype=DTYPE)
@@ -189,7 +191,7 @@ for band in opts.bands:
         logging.info("about to allocate data %s", psutil.virtual_memory())
 
         if s == 0:
-            data = np.zeros(data_shape, dtype=DTYPE)
+            data = np.empty(data_shape, dtype=DTYPE)
         else:
             data *= 0
         filenames = group.create_dataset("%s_filenames" % suffix, (len(opts.pols), N_CHANNELS, opts.n), dtype="S%d" % len(header_file), compression='lzf')
@@ -203,9 +205,9 @@ for band in opts.bands:
             for p, pol in enumerate(opts.pols):
 
                 if band is None:
-                    infile = FILENAME.format(obsid=obsid, time=t+opts.start, pol=pol, suffix=suffix)
+                    infile = FILENAME.format(obsid=obsid, prefix=opts.prefix, time=t+opts.start, pol=pol, suffix=suffix)
                 else:
-                    infile = FILENAME_BAND.format(obsid=obsid, band=band, time=t+opts.start, pol=pol, suffix=suffix)
+                    infile = FILENAME_BAND.format(obsid=obsid, band=band, prefix=opts.prefix, time=t+opts.start, pol=pol, suffix=suffix)
                 logging.info(" processing %s", infile)
                 hdus = fits.open(infile, memmap=True)
                 filenames[p, 0, t] = infile.encode("utf-8")
